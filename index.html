@@ -33,8 +33,6 @@ body{
 position:relative;
 }
 
-/* 背景六角區 */
-
 .hexbg{
 position:fixed;
 inset:0;
@@ -47,6 +45,7 @@ position:absolute;
 width:220px;
 height:220px;
 border:1px solid rgba(0,255,120,0.15);
+
 clip-path:polygon(
 25% 6.7%,
 75% 6.7%,
@@ -95,10 +94,8 @@ opacity:.5;
 }
 }
 
-/* 主體 */
-
 .container{
-max-width:1500px;
+max-width:1600px;
 margin:auto;
 padding:60px 30px;
 text-align:center;
@@ -139,7 +136,7 @@ margin-bottom:60px;
 .cards{
 display:grid;
 grid-template-columns:
-repeat(auto-fit,minmax(280px,1fr));
+repeat(auto-fit,minmax(320px,1fr));
 gap:28px;
 }
 
@@ -150,7 +147,7 @@ border:1px solid rgba(255,255,255,.1);
 
 border-radius:20px;
 
-padding:35px 25px;
+padding:25px;
 
 text-decoration:none;
 
@@ -160,7 +157,10 @@ transition:.35s;
 }
 
 .card:hover{
-transform:translateY(-8px);
+
+transform:
+translateY(-8px)
+scale(1.02);
 
 border-color:#00ff88;
 
@@ -168,8 +168,22 @@ box-shadow:
 0 0 35px rgba(0,255,120,.2);
 }
 
+.card img{
+
+width:100%;
+
+height:220px;
+
+object-fit:cover;
+
+border-radius:12px;
+
+margin-bottom:18px;
+
+}
+
 .card h2{
-font-size:38px;
+font-size:28px;
 margin-bottom:12px;
 }
 
@@ -210,10 +224,9 @@ Industrial Design × Embodied Intelligence × Offline Runtime
 
 <div class="cards">
 
-<a class="card"
-href="digital-twin-a/">
+<a class="card" href="digital-twin-a/">
 
-<img src="digital-twin-a/preview1.jpg" width="100%">
+<img src="digital-twin-a/preview1.jpg">
 
 <h2>Digital Twin A</h2>
 
@@ -225,10 +238,9 @@ Ink Aesthetics & Knowledge Archive
 
 </a>
 
-<a class="card"
-href="digital-twin-b/">
+<a class="card" href="digital-twin-b/">
 
-<img src="digital-twin-b/preview2.jpg" width="100%">
+<img src="digital-twin-b/preview2.jpg">
 
 <h2>Digital Twin B</h2>
 
@@ -240,10 +252,9 @@ Empathy & Human-Centered Collaboration
 
 </a>
 
-<a class="card"
-href="titan-siege/">
+<a class="card" href="titan-siege/">
 
-<img src="titan-siege/preview4.jpg" width="100%">
+<img src="titan-siege/preview4.jpg">
 
 <h2>Titan Siege</h2>
 
@@ -253,10 +264,9 @@ Offline Physics Castle Attack Game
 
 </a>
 
-<a class="card"
-href="mazinger-z/">
+<a class="card" href="mazinger-z/">
 
-<img src="mazinger-z/preview3.jpg" width="100%">
+<img src="mazinger-z/preview3.jpg">
 
 <h2>Mazinger Z</h2>
 
@@ -266,10 +276,42 @@ Offline Robot Battle Simulation
 
 </a>
 
+<a class="card"
+href="https://taiwanyuyuchen.mystrikingly.com/"
+target="_blank">
+
+<img src="portfolio.jpg">
+
+<h2>YYC Portfolio</h2>
+
+<p>
+Industrial Design Portfolio
+<br>
+Product Design × Engineering × Innovation
+</p>
+
+</a>
+
+<a class="card"
+href="https://consumerelectronics3c.mystrikingly.com/"
+target="_blank">
+
+<img src="consumer3c.jpg">
+
+<h2>Consumer Electronics 3C</h2>
+
+<p>
+Consumer Electronics Design
+<br>
+3C Products × Innovation × Manufacturing
+</p>
+
+</a>
+
 </div>
 
 <div class="footer">
-YYC
+YYC Digital Universe © YYC
 </div>
 
 </div>
