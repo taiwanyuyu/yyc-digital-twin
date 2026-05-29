@@ -16,7 +16,7 @@ Offline Human Truth Resume System
 離線人類真值履歷系統（水墨版）
 
 Folder：
-digital-twin-a
+[進入A版](https://taiwanyuyu.github.io/yyc-digital-twin/digital-twin-a/)
 
 ---
 
@@ -27,7 +27,7 @@ Offline Human Truth Resume System
 離線人類真值履歷系統（博愛版）
 
 Status：
-Coming Soon
+[進入B版](https://taiwanyuyu.github.io/yyc-digital-twin/digital-twin-b/)
 
 ---
 
@@ -38,7 +38,7 @@ Offline Physics Castle Attack Game
 離線物理攻城遊戲
 
 Status：
-Coming Soon
+[進入Titan Siege](https://taiwanyuyu.github.io/yyc-digital-twin/titan-siege/)
 
 ---
 
@@ -49,7 +49,7 @@ Offline Robot Battle Simulation
 離線機器人戰鬥模擬
 
 Status：
-Coming Soon
+[進入Mazinger Z](https://taiwanyuyu.github.io/yyc-digital-twin/mazinger-z/)
 
 ---
 
