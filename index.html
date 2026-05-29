@@ -7,13 +7,7 @@
 <title>YYC Digital Universe</title>
 
 <link rel="icon"
-href="data:image/svg+xml,
-<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'>
-<rect width='64' height='64' rx='12' fill='%2300AA55'/>
-<text x='50%' y='58%' font-size='28' font-family='Arial'
-font-weight='bold' fill='white'
-text-anchor='middle'>YYC</text>
-</svg>">
+href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' rx='12' fill='%23008040'/><text x='50%' y='58%' font-size='28' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'>YYC</text></svg>">
 
 <style>
 
@@ -23,54 +17,254 @@ padding:0;
 box-sizing:border-box;
 }
 
-html,
-body{
+html,body{
 width:100%;
 height:100%;
-overflow-x:hidden;
 background:#050505;
+color:white;
 font-family:
 "Segoe UI",
 "Noto Sans TC",
 sans-serif;
-color:white;
+overflow-x:hidden;
 }
 
-#hexbg{
+body{
+position:relative;
+}
+
+/* 背景六角區 */
+
+.hexbg{
 position:fixed;
 inset:0;
 z-index:-1;
-background:#050505;
+overflow:hidden;
 }
 
+.hex{
+position:absolute;
+width:220px;
+height:220px;
+border:1px solid rgba(0,255,120,0.15);
+clip-path:polygon(
+25% 6.7%,
+75% 6.7%,
+100% 50%,
+75% 93.3%,
+25% 93.3%,
+0% 50%
+);
+
+animation:
+rotateHex 40s linear infinite,
+pulseHex 6s ease-in-out infinite;
+}
+
+.hex:nth-child(1){
+top:5%;
+left:10%;
+}
+
+.hex:nth-child(2){
+top:25%;
+right:8%;
+}
+
+.hex:nth-child(3){
+bottom:15%;
+left:15%;
+}
+
+.hex:nth-child(4){
+bottom:8%;
+right:18%;
+}
+
+@keyframes rotateHex{
+from{transform:rotate(0deg);}
+to{transform:rotate(360deg);}
+}
+
+@keyframes pulseHex{
+0%,100%{
+opacity:.15;
+}
+50%{
+opacity:.5;
+}
+}
+
+/* 主體 */
+
 .container{
-max-width:1400px;
+max-width:1500px;
 margin:auto;
 padding:60px 30px;
 text-align:center;
 }
 
 .logo{
-width:120px;
-height:120px;
+width:130px;
+height:130px;
 margin:auto;
 margin-bottom:25px;
 
-background:#00AA55;
+background:#008040;
 
-border-radius:24px;
+border-radius:28px;
 
 display:flex;
 align-items:center;
 justify-content:center;
 
-font-size:48px;
+font-size:52px;
 font-weight:900;
-color:white;
 
 box-shadow:
-0 0 30px rgba(0,255,120,.3);
+0 0 25px rgba(0,255,120,.25);
 }
 
 h1{
-font-size:72
+font-size:68px;
+margin-bottom:15px;
+}
+
+.subtitle{
+font-size:24px;
+opacity:.8;
+margin-bottom:60px;
+}
+
+.cards{
+display:grid;
+grid-template-columns:
+repeat(auto-fit,minmax(280px,1fr));
+gap:28px;
+}
+
+.card{
+background:rgba(255,255,255,.05);
+
+border:1px solid rgba(255,255,255,.1);
+
+border-radius:20px;
+
+padding:35px 25px;
+
+text-decoration:none;
+
+color:white;
+
+transition:.35s;
+}
+
+.card:hover{
+transform:translateY(-8px);
+
+border-color:#00ff88;
+
+box-shadow:
+0 0 35px rgba(0,255,120,.2);
+}
+
+.card h2{
+font-size:38px;
+margin-bottom:12px;
+}
+
+.card p{
+opacity:.85;
+line-height:1.6;
+}
+
+.footer{
+margin-top:80px;
+opacity:.5;
+font-size:14px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="hexbg">
+<div class="hex"></div>
+<div class="hex"></div>
+<div class="hex"></div>
+<div class="hex"></div>
+</div>
+
+<div class="container">
+
+<div class="logo">
+YYC
+</div>
+
+<h1>YYC Digital Universe</h1>
+
+<div class="subtitle">
+Industrial Design × Embodied Intelligence × Offline Runtime
+</div>
+
+<div class="cards">
+
+<a class="card"
+href="digital-twin-a/">
+
+<h2>Digital Twin A</h2>
+
+<p>
+InkBrain Edition
+<br>
+Ink Aesthetics & Knowledge Archive
+</p>
+
+</a>
+
+<a class="card"
+href="digital-twin-b/">
+
+<h2>Digital Twin B</h2>
+
+<p>
+BoAi Edition
+<br>
+Empathy & Human-Centered Collaboration
+</p>
+
+</a>
+
+<a class="card"
+href="titan-siege/">
+
+<h2>Titan Siege</h2>
+
+<p>
+Offline Physics Castle Attack Game
+</p>
+
+</a>
+
+<a class="card"
+href="mazinger-z/">
+
+<h2>Mazinger Z</h2>
+
+<p>
+Offline Robot Battle Simulation
+</p>
+
+</a>
+
+</div>
+
+<div class="footer">
+YYC
+</div>
+
+</div>
+
+</body>
+</html>
