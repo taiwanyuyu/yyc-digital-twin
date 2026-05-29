@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>泰坦攻城 V206.20 (Smart Flow)</title>
+    <style>
+        /* V206.20 樣式 */
+        body { 
+            margin: 0; overflow: hidden; 
+            background: radial-gradient(circle at center, #1a3a2a 0%, #0a0a0a 100%); 
+            touch-action: none; user-select: none; -webkit-user-select: none; 
+        }
+        
+        #loading-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            background: rgba(0,0,0,0.8); z-index: 50; pointer-events: none;
+            transition: opacity 0.5s;
+        }
+        #loading-text {
+            color: #39FF14; font-family: "Microsoft JhengHei", sans-serif;
+            font-size: 24px; font-weight: bold; text-shadow: 0 0 10px rgba(57,255,20,0.8);
+            letter-spacing: 2px;
+        }
+
+        #hud-panel { 
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%); 
+            color: #ccffcc; font-family: "Microsoft JhengHei", sans-serif; 
+            background: rgba(0, 20, 10, 0.7); 
+            padding: 8px 15px 12px 15px; 
+            border-radius: 20px; 
+            border: 1px solid rgba(57, 255, 20, 0.5); 
+            z-index: 10; font-size: 14px; text-align: center; 
+            width: 70%; max-width: 340px; 
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.2); 
+            backdrop-filter: blur(8px);
+            line-height: 1.4; 
+            transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); 
+            cursor: pointer; 
+            pointer-events: auto; 
+            display: flex; flex-direction: column;
+        }
+
+        #hud-panel.expanded { background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(12px); }
+        .hud-collapsible { height: 0; overflow: hidden; opacity: 0; transition: all 0.3s ease; }
+        #hud-panel.expanded .hud-collapsible { height: auto; opacity: 1; margin-bottom: 10px; padding-top: 5px; }
+
+        /* V206.20: Home Icon */
+        .hud-header { display: flex; justify-content: center; align-items: center; gap: 10px; }
+        
+        #home-btn {
+            width: 28px; height: 28px;
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; position: relative;
+            transition: transform 0.2s;
+            border: 1px solid rgba(57, 255, 20, 0.3); 
+            border-radius: 50%;
+            background: rgba(0,0,0,0.3);
+        }
+        #home-btn:hover { transform: scale(1.1); background: rgba(57, 255, 20, 0.2); border-color: #39FF14; }
+        
+        /* 屋頂 */
+        #home-icon-roof {
+            position: absolute; top: 5px;
+            width: 0; height: 0; 
+            border-left: 7px solid transparent;
+            border-right: 7px solid transparent;
+            border-bottom: 7px solid #39FF14;
+        }
+        /* 屋身 */
+        #home-icon-body {
+            position: absolute; bottom: 6px;
+            width: 10px; height: 8px;
+            background-color: #39FF14;
+        }
+        /* 煙囪 */
+        #home-icon-chimney {
+            position: absolute; top: 6px; right: 7px;
+            width: 2px; height: 4px;
+            background-color: #39FF14;
+        }
+
+        #hud-panel .title-cn { 
+            font-size: 15px; color: #39FF14; text-shadow: 0 0 5px rgba(57, 255, 20, 0.5); font-weight: bold; 
+            display: flex; justify-content: center; align-items: center; gap: 5px;
+        }
+
+        #rank-badge { font-size: 18px; filter: drop-shadow(0 0 5px gold); }
+        #hud-panel .status-text-cn { font-size: 12px; color: #fff; margin-top: 5px; }
+        
+        .stats-container { display: flex; justify-content: space-around; width: 100%; padding-top: 4px; }
+        .stat-item { text-align: center; font-size: 11px; line-height: 1.2; color: #bbb; }
+        .stat-value { font-size: 17px; font-weight: bold; color: #39FF14; margin-bottom: 2px; font-family: "Arial Black", sans-serif; letter-spacing: 1px; }
+        .stat-item.blocks .stat-value { color: #ff4444; text-shadow: 0 0 8px rgba(255, 50, 50, 0.6); } 
+        
+        #power-bar-container { width: 100%; height: 6px; background: rgba(255,255,255,0.1); margin-top: 10px; border-radius: 4px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.5); }
+        #power-bar { width: 0%; height: 100%; background: linear-gradient(to right, #39FF14, #ccff00); border-radius: 4px; transition: width 0.1s; }
+        
+        #toggle-hint { position: absolute; top: 5px; right: 10px; font-size: 10px; color: rgba(255,255,255,0.3); transition: transform 0.3s; }
+        #hud-panel.expanded #toggle-hint { transform: rotate(180deg); }
+
+        /* 左下控制鈕 (置中) */
+        .btn-container { 
+            position: absolute; 
+            bottom: 30px; 
+            left: 20px; 
+            transform: none;
+            display: flex; gap: 15px; z-index: 20; pointer-events: auto; 
+        }
+        
+        @media (max-width: 600px) {
+            .btn-container {
+                left: 50%;
+                transform: translateX(-50%);
+                width: 100%;
+                justify-content: center;
+                bottom: 20px;
+            }
+        }
+
+        .btn { 
+            background: rgba(20, 20, 20, 0.8); color: white; border: 1px solid rgba(57, 255, 20, 0.3); 
+            padding: 10px 20px; cursor: pointer; border-radius: 30px; font-size: 14px; font-weight: bold; letter-spacing: 1px; backdrop-filter: blur(10px); 
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3); transition: all 0.2s; 
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn.reset { background: linear-gradient(135deg, rgba(255,50,50,0.2), rgba(100,0,0,0.4)); color: #ffcccc; border-color: rgba(255,80,80,0.5); }
+        #btn-slow { background: linear-gradient(135deg, rgba(57, 255, 20, 0.1), rgba(0, 100, 0, 0.2)); color: #39FF14; } 
+        .btn.slow.active { background: #39FF14 !important; border-color: #fff !important; color: #000 !important; box-shadow: 0 0 20px rgba(57, 255, 20, 0.8); }
+        
+        .btn-text-cn { font-size: 14px; font-weight: 700; }
+        .btn-text-en { font-size: 9px; opacity: 0.7; }
+
+        /* 戰術軍火庫 (Armory) UI */
+        #armory-panel {
+            position: absolute; 
+            bottom: 30px; right: 20px;
+            display: flex; flex-direction: row; gap: 8px;
+            background: rgba(0, 20, 10, 0.6);
+            border: 1px solid rgba(57, 255, 20, 0.3);
+            border-radius: 15px; padding: 8px;
+            backdrop-filter: blur(5px);
+            z-index: 20;
+            pointer-events: auto;
+            transition: transform 0.2s;
+        }
+
+        /* 手機版響應式 (直式介面) - V206.20: 縮小尺寸 */
+        @media (max-width: 600px) {
+            #armory-panel {
+                bottom: auto; 
+                top: 50%; 
+                right: 5px; 
+                transform: translateY(-50%); 
+                flex-direction: column; 
+                padding: 5px;
+                gap: 5px;
+            }
+            .weapon-slot {
+                width: 34px !important; 
+                height: 45px !important; 
+            }
+            .weapon-icon { font-size: 16px !important; }
+            .weapon-count { font-size: 9px !important; }
+            .weapon-name { display: none; } 
+        }
+
+        .weapon-slot {
+            width: 55px; height: 65px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
+        }
+        .weapon-slot.locked { opacity: 0.3; pointer-events: none; filter: grayscale(1); }
+        .weapon-slot:hover { background: rgba(57, 255, 20, 0.1); border-color: #39FF14; transform: scale(1.05); }
+        
+        .weapon-slot.active { 
+            background: rgba(57, 255, 20, 0.25); 
+            border-color: #39FF14; 
+            box-shadow: 0 0 15px rgba(57, 255, 20, 0.5); 
+        }
+        
+        .weapon-icon { font-size: 24px; margin-bottom: 2px; }
+        .weapon-count { font-size: 10px; color: #39FF14; font-weight: bold; font-family: "Arial Black"; }
+        .weapon-name { font-size: 8px; color: #aaa; position: absolute; bottom: 2px; }
+
+        #reload-msg {
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            color: #ff3333; font-family: "Impact", sans-serif; font-size: 40px;
+            text-shadow: 0 0 20px rgba(255, 0, 0, 0.8);
+            letter-spacing: 5px; pointer-events: none;
+            opacity: 0; transition: opacity 0.3s; z-index: 40;
+            border: 2px solid #ff3333; padding: 10px 30px; background: rgba(0,0,0,0.5);
+            transform: translate(-50%, -50%) rotate(-5deg);
+        }
+        
+        /* 選單樣式 */
+        #pattern-selection-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.92); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; font-family: "Microsoft JhengHei", sans-serif; color: white; transition: opacity 0.5s; }
+        #pattern-selection-panel { background: rgba(20, 20, 20, 0.95); border-radius: 20px; padding: 30px; box-shadow: 0 0 40px rgba(57, 255, 20, 0.2); max-width: 90%; text-align: center; border: 1px solid #333; }
+        .pattern-button-container { display: flex; justify-content: center; gap: 15px; margin-top: 25px; flex-wrap: wrap; }
+        
+        .mode-btn-group { display: flex; align-items: stretch; background: rgba(57, 255, 20, 0.05); border: 1px solid rgba(57, 255, 20, 0.4); border-radius: 12px; overflow: hidden; transition: all 0.2s; min-width: 140px; }
+        .mode-btn-group:hover { box-shadow: 0 0 15px rgba(57, 255, 20, 0.3); border-color: #39FF14; }
+        .mode-btn-main { background: transparent; border: none; color: #39FF14; padding: 12px 15px; cursor: pointer; font-size: 15px; font-weight: bold; flex-grow: 1; text-align: center; transition: background 0.2s; }
+        .mode-btn-main:hover { background: rgba(57, 255, 20, 0.15); }
+        .mode-btn-main:active { background: rgba(57, 255, 20, 0.3); }
+        .mode-btn-setting { background: rgba(0,0,0,0.2); border: none; border-left: 1px solid rgba(57, 255, 20, 0.3); color: #39FF14; padding: 0 12px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+        .mode-btn-setting:hover { background: rgba(57, 255, 20, 0.3); }
+        .mode-btn-setting:active { background: rgba(57, 255, 20, 0.5); }
+        .mode-btn-group.locked { border-color: #444; background: rgba(255,255,255,0.02); }
+        .mode-btn-group.locked .mode-btn-main { color: #888; cursor: pointer; }
+        .mode-btn-group.locked .mode-btn-setting { display: none; }
+        .mode-btn-group:hover .mode-btn-setting { animation: spin 4s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        #upload-modal-overlay { display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 200; align-items: center; justify-content: center; font-family: 'Microsoft JhengHei', sans-serif; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+</head>
+<body>
+    <div id="loading-overlay"><div id="loading-text">SYSTEM INITIALIZING...</div></div>
+    <div id="reload-msg">WEAPON EQUIPPED</div>
+
+    <!-- HUD 面板 -->
+    <div id="hud-panel" onclick="this.classList.toggle('expanded')">
+        <div id="toggle-hint">▼</div>
+        <div class="hud-collapsible">
+            <div class="hud-header">
+                <!-- V206.20: Home Icon -->
+                <div id="home-btn" onclick="event.stopPropagation(); window.showPatternSelection();" title="回到主頁">
+                    <div id="home-icon-chimney"></div>
+                    <div id="home-icon-roof"></div>
+                    <div id="home-icon-body"></div>
+                </div>
+                <div class="title-cn"><span id="rank-badge"></span>V206.20 泰坦攻城</div>
+            </div>
+            <div class="title-en">Titan Siege Core - Mobile Ops</div>
+            <div class="status-text-cn">狀態: <span id="status-text-cn" style="color:#fff">系統初始化...</span></div>
+        </div>
+        <div class="stats-container">
+            <div class="stat-item shots"><div class="stat-label-cn">發射數</div><div id="stats-shots-cn" class="stat-value">0</div></div>
+            <div class="stat-item blocks"><div class="stat-label-cn">區域殘量</div><div id="stats-blocks-cn" class="stat-value">0</div></div>
+            <div class="stat-item timer"><div class="stat-label-cn">時間</div><div id="stats-timer-cn" class="stat-value">0:00.0</div></div>
+        </div>
+        <div id="power-bar-container"><div id="power-bar"></div></div>
+    </div>
+
+    <!-- 左側控制按鈕 -->
+    <div class="btn-container">
+        <button class="btn reset" onclick="resetSimulation()"><div class="btn-text-cn">重置</div><div class="btn-text-en">RESET</div></button>
+        <button id="btn-slow" class="btn slow" onclick="toggleSlowMo()"><div class="btn-text-cn">慢動作</div><div class="btn-text-en">SLOW</div></button>
+    </div>
+
+    <!-- 右側軍火庫面板 -->
+    <div id="armory-panel">
+        <div id="slot-standard" class="weapon-slot active" onclick="selectWeapon('standard')">
+            <div class="weapon-icon">🥎</div>
+            <div class="weapon-name">STD</div>
+            <div class="weapon-count">∞</div>
+        </div>
+        <div id="slot-grenade" class="weapon-slot locked" onclick="selectWeapon('grenade')">
+            <div class="weapon-icon">🐢</div>
+            <div class="weapon-name">FRAG</div>
+            <div class="weapon-count">∞</div>
+        </div>
+        <div id="slot-gl" class="weapon-slot locked" onclick="selectWeapon('gl')">
+            <div class="weapon-icon">💊</div>
+            <div class="weapon-name">MORTAR</div>
+            <div class="weapon-count">∞</div>
+        </div>
+        <div id="slot-nuke" class="weapon-slot locked" onclick="selectWeapon('nuke')">
+            <div class="weapon-icon">☢️</div>
+            <div class="weapon-name">NUKE</div>
+            <div id="count-nuke" class="weapon-count">0</div>
+        </div>
+    </div>
+
+    <!-- 模式選擇選單 -->
+    <div id="pattern-selection-overlay">
+        <div id="pattern-selection-panel">
+            <h2 style="color: #39FF14; text-shadow: 0 0 10px rgba(57,255,20,0.5);">V206.20 Smart Flow</h2>
+            <p style="opacity: 0.8; margin-bottom: 20px; color:#ccc">生涯勝場: <span id="career-wins" style="color:#fff; font-weight:bold;">0</span> | 軍階: <span id="career-rank" style="color:#39FF14; font-weight:bold;">Rookie</span></p>
+            <div id="pattern-buttons" class="pattern-button-container"></div>
+            <p id="unlock-hint" style="font-size: 10px; opacity: 0.5; margin-top: 30px;">提示: 累積勝場解鎖新武器<br>閒置15秒將自動返回</p>
+        </div>
+    </div>
+    
+    <!-- 上傳模態框 -->
+    <div id="upload-modal-overlay">
+        <div id="upload-modal-panel" style="background: #222; padding: 30px; border-radius: 15px; max-width: 350px; text-align: center; color: white; border: 1px solid #39FF14; box-shadow: 0 0 30px rgba(57,255,20,0.3);">
+            <h3 style="color: #39FF14;">P-Rasterization 插槽</h3>
+            <p style="opacity: 0.7; font-size: 12px; margin-bottom: 20px;">選擇圖片以自訂積木紋理</p>
+            <input type="file" id="image-upload-input" accept="image/*" style="margin-bottom: 15px; display: block; width: 100%; padding: 10px; background: #333; border: 1px solid #555; border-radius: 5px; color: #fff;"/>
+            <button id="apply-texture-btn" class="pattern-select-btn" style="width: 100%; margin-bottom: 10px;">應用 (APPLY)</button>
+            <button id="cancel-upload-btn" class="pattern-select-btn" style="background: #444; color: #ccc; border-color: #666; width: 100%;">直接開戰 (SKIP)</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const TEXT_CONFIG = {
+            title_cn: "V206.20 泰坦攻城 (Smart Flow)",
+            status_init: "系統初始化...",
+            status_building: "系統建構中...",
+            status_ready: "等待擊發...",
+            status_charging: "蓄力中...",
+            status_slowmo: "慢動作 (0.05x)",
+            status_unlock_success: "首次解鎖成功！用時", 
+            status_replay_success: "挑戰完成！用時",     
+            status_timeout: "超時完成",
+            status_practice_done: "練習目標達成！", 
+            status_fail: "時間耗盡！任務失敗。",
+            unlock_hint: "提示: 挑戰模式成功後可永久解鎖自訂插槽"
+        };
+
+        const HEART_COLOR = 0xff0044; const FILL_COLOR = 0xeeeeee;
+        const MODE_SETTINGS = {
+            'Heart': { name_cn: '愛心 (練習)', time_s: 9999, slot: 'none', matrix: [[0,0,0,0,0,0,0,0,0,0], [0,0,1,1,0,0,1,1,0,0], [0,1,1,1,1,1,1,1,1,0], [0,1,1,1,1,1,1,1,1,0], [0,1,1,1,1,1,1,1,1,0], [0,0,1,1,1,1,1,1,0,0], [0,0,0,1,1,1,1,0,0,0], [0,0,0,0,1,1,0,0,0,0], [0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0]].reverse() },
+            'Car': { name_cn: '汽車 (45s)', time_s: 45, slot: 'slot1', matrix: [[0,0,0,0,0,0,0,0,0,0], [0,0,0,0,1,1,0,0,0,0], [0,1,1,1,1,1,1,1,1,0], [0,1,1,1,1,1,1,1,1,0], [0,1,1,1,1,1,1,1,1,0], [0,0,1,1,1,1,1,1,0,0], [0,1,1,0,0,0,0,1,1,0], [0,0,1,0,0,0,0,1,0,0], [0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0]].reverse() },
+            'Bear': { name_cn: '熊臉 (30s)', time_s: 30, slot: 'slot2', matrix: [[0,1,0,0,0,0,0,0,1,0], [1,1,1,0,0,0,0,1,1,1], [1,1,1,1,0,0,1,1,1,1], [0,1,1,1,1,1,1,1,1,0], [0,0,1,0,1,1,0,1,0,0], [0,0,1,1,1,1,1,1,0,0], [0,0,0,1,1,1,1,0,0,0], [0,0,0,0,1,1,0,0,0,0], [0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0]].reverse() },
+            'Star': { name_cn: '星核 (25s)', time_s: 25, slot: 'slot3', matrix: [[0,0,0,0,1,1,0,0,0,0], [0,0,0,1,1,1,1,0,0,0], [0,0,1,1,1,1,1,1,0,0], [0,1,1,1,0,0,1,1,1,0], [1,1,0,0,0,0,0,0,1,1], [1,0,0,0,0,0,0,0,0,1], [0,1,1,0,0,0,0,1,1,0], [0,0,1,1,1,1,1,0,0,0], [0,0,0,1,0,0,1,0,0,0], [0,0,0,0,0,0,0,0,0,0]].reverse() },
+        };
+
+        // --- Global Variables ---
+        var currentChallengeModeKey = 'Heart'; var CURRENT_UNLOCK_TIME_LIMIT = 9999; 
+        var isGameRunning = false;
+        var isConstructing = false; 
+        var S, C, R, World;
+        var AllMeshes = [], AllBodies = [], shockwaves = []; 
+        var dt = (1/60); 
+        var isSlowMo = false; var SLOW_FACTOR = 14; 
+        var isPressing = false; var pressStartTime = 0; 
+        var BOX_SIZE = 12.0; var BALL_RADIUS = 12.0; 
+        var BALL_MASS = 10000; var BLOCK_MASS = 1000; 
+        var WALL_DIM = 10; var WALL_WIDTH_EXTENDED = 10;
+        var shotsFired = 0; var blocksRemaining = 0; 
+        var gameTimeElapsed = 0; var lastFrameTime = 0;
+        var audioCtx = null;
+        var currentPcoreSlot = null;
+        var targetFrameMesh = null; 
+        
+        // V206.20: 邏輯控制變數
+        var lastInteractionTime = 0;
+        var levelStartTime = 0; // 關卡載入完成的時間
+        var hasStartedShooting = false; // 是否已開始射擊
+
+        // 物理常數
+        const MAX_POWER_MULT = 3.0; 
+        const SHOOT_SPEED_BASE = 15; 
+        const GRAVITY_VAL = -13; 
+
+        // Consts
+        const PLATFORM_HALF_SIZE = (12 * BOX_SIZE) / 2 + 2; 
+        const BOTTOM_PLATFORM_SIZE = 3000; 
+        const BOUNDARY_SIZE = 1000;
+        const TARGET_FRAME_VISUAL_COUNT_X = 12; 
+        const TARGET_BLOCK_COUNT_Y = 10; 
+        const TARGET_FRAME_Z_DEPTH = 10; 
+        const TARGET_FRAME_VISUAL_SCALE = 1.05;
+
+        // Assets
+        var sharedSphereGeo, sharedRingGeo, sharedSphereMat, sharedRingMat;
+        var softballGeo, softballMat, grenadeGeo, grenadeMat, glMat, nukeGeo, nukeMat;
+        var currentWeapon = 'standard';
+
+        // --- Main Functions ---
+
+        function init() {
+            // 初始化特效幾何
+            sharedSphereGeo = new THREE.SphereGeometry(1, 32, 32);
+            sharedRingGeo = new THREE.TorusGeometry(3, 0.5, 16, 100);
+            sharedSphereMat = new THREE.MeshBasicMaterial({ color: 0xccffff, transparent: true, opacity: 0.8 });
+            sharedRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 });
+
+            initScene();
+            initPhysics();
+            initAllWeaponAssets();
+            
+            if(document.getElementById('pattern-selection-overlay')) {
+                showPatternSelection();
+            }
+            setupEvents(); 
+            animate();
+        }
+
+        function initScene() {
+            S = new THREE.Scene(); S.background = null; 
+            C = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 1, 5000); 
+            C.position.set(0, 150, 400); C.lookAt(0, 70, 0); 
+            R = new THREE.WebGLRenderer({antialias: true, alpha: true}); 
+            R.setSize(window.innerWidth, window.innerHeight);
+            R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap; R.outputEncoding = THREE.sRGBEncoding;
+            R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.1;
+            document.body.appendChild(R.domElement);
+
+            var hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6); hemiLight.position.set(0, 200, 0); S.add(hemiLight);
+            var dirLight = new THREE.DirectionalLight(0xfffff0, 1.2); dirLight.position.set(100, 300, 100); dirLight.castShadow = true; 
+            dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048; 
+            dirLight.shadow.camera.near = 0.5; dirLight.shadow.camera.far = 1000; 
+            dirLight.shadow.camera.left = -300; dirLight.shadow.camera.right = 300; dirLight.shadow.camera.top = 300; dirLight.shadow.camera.bottom = -300; 
+            dirLight.shadow.bias = -0.0001; S.add(dirLight);
+
+            var platformGeo = new THREE.BoxGeometry(PLATFORM_HALF_SIZE*2, 20, PLATFORM_HALF_SIZE*2); 
+            var platformMat = new THREE.MeshStandardMaterial({ color:0x444444, roughness:0.8, metalness:0.2 }); 
+            var F = new THREE.Mesh(platformGeo, platformMat); F.position.set(0, -10, 0); 
+            F.receiveShadow = true; F.castShadow = true; S.add(F);
+
+            var bottomPlatformGeo = new THREE.BoxGeometry(BOTTOM_PLATFORM_SIZE*2, 20, BOTTOM_PLATFORM_SIZE*2); 
+            var bottomPlatformMat = new THREE.MeshStandardMaterial({ color:0x333333, roughness:0.9, metalness:0.1 }); 
+            var BF = new THREE.Mesh(bottomPlatformGeo, bottomPlatformMat); BF.position.set(0, -150, 0); 
+            BF.receiveShadow = true; S.add(BF);
+            
+            var G_Bottom = new THREE.GridHelper(BOTTOM_PLATFORM_SIZE*2, 200, 0x555555, 0x222222); 
+            G_Bottom.position.set(0, -139, 0); G_Bottom.material.opacity = 0.3; G_Bottom.material.transparent = true; S.add(G_Bottom);
+            
+            var G = new THREE.GridHelper(PLATFORM_HALF_SIZE*2, 12, 0x39FF14, 0x555555); 
+            G.position.y = 0.1; G.material.opacity = 0.4; G.material.transparent = true; S.add(G);
+
+            var targetFrameSizeX = 12 * BOX_SIZE * 1.05; 
+            var targetFrameSizeY = 10 * BOX_SIZE * 1.05; 
+            var targetFrameDepth = 10 * BOX_SIZE * 1.05; 
+            var targetFrameGeo = new THREE.BoxGeometry(targetFrameSizeX, targetFrameSizeY, targetFrameDepth);
+            targetFrameMesh = new THREE.LineSegments(new THREE.EdgesGeometry(targetFrameGeo), new THREE.LineDashedMaterial({ color: 0x39FF14, linewidth: 1, scale: 1, dashSize: 3, gapSize: 3, transparent: true, opacity: 0.8, depthTest: false }));
+            targetFrameMesh.computeLineDistances(); targetFrameMesh.position.set(0, targetFrameSizeY / 2, 0); S.add(targetFrameMesh);
+        }
+
+        function initPhysics() {
+            World = new CANNON.World(); 
+            World.gravity.set(0, -13, 0); 
+            World.broadphase = new CANNON.SAPBroadphase(World); 
+            // 減少物理迭代次數，提升流暢度
+            World.solver.iterations = 10; 
+            World.allowSleep = true; 
+            var matDefault = new CANNON.Material();
+            var contactMat = new CANNON.ContactMaterial(matDefault, matDefault, { friction: 0.3, restitution: 0.6, contactEquationStiffness: 1e9, contactEquationRelaxation: 2 });
+            World.addContactMaterial(contactMat);
+
+            var groundShape = new CANNON.Box(new CANNON.Vec3(PLATFORM_HALF_SIZE, 10, PLATFORM_HALF_SIZE)); 
+            var bodyGround = new CANNON.Body({ mass: 0, material: matDefault }); 
+            bodyGround.addShape(groundShape); bodyGround.position.set(0, -9.9, 0); World.addBody(bodyGround);
+
+            var wallThick = 10; var wallHeight = 500; var boundSize = 1000; var wallOffset = (BOUNDARY_SIZE / 2) + (wallThick / 2);
+            var wallShapeX = new CANNON.Box(new CANNON.Vec3(wallThick/2, wallHeight/2, BOUNDARY_SIZE/2));
+            var wallShapeZ = new CANNON.Box(new CANNON.Vec3(BOUNDARY_SIZE/2, wallHeight/2, wallThick/2));
+            
+            var bLeft = new CANNON.Body({ mass: 0, material: matDefault }); bLeft.addShape(wallShapeX); bLeft.position.set(-wallOffset, wallHeight/2, 0); World.addBody(bLeft);
+            var bRight = new CANNON.Body({ mass: 0, material: matDefault }); bRight.addShape(wallShapeX); bRight.position.set(wallOffset, wallHeight/2, 0); World.addBody(bRight);
+            var bFront = new CANNON.Body({ mass: 0, material: matDefault }); bFront.addShape(wallShapeZ); bFront.position.set(0, wallHeight/2, wallOffset); World.addBody(bFront);
+            var bBack = new CANNON.Body({ mass: 0, material: matDefault }); bBack.addShape(wallShapeZ); bBack.position.set(0, wallHeight/2, -wallOffset); World.addBody(bBack);
+            var ceilingShape = new CANNON.Box(new CANNON.Vec3(BOUNDARY_SIZE/2, wallThick/2, BOUNDARY_SIZE/2)); var bTop = new CANNON.Body({ mass: 0, material: matDefault }); bTop.addShape(ceilingShape); bTop.position.set(0, wallHeight, 0); World.addBody(bTop);
+        }
+
+        function initAllWeaponAssets() {
+            // 1. Softball (Standard)
+            const c1 = document.createElement('canvas'); c1.width = 512; c1.height = 256; const ctx1 = c1.getContext('2d');
+            ctx1.fillStyle = '#39FF14'; ctx1.fillRect(0,0,512,256); ctx1.fillStyle = '#CC0000';
+            for(let i=0; i<400; i++){ const t = (i/400)*Math.PI*2; const R=1, C=0.4; const x = R*Math.cos(t)*Math.cos(C*Math.sin(2*t)); const y = R*Math.sin(t)*Math.cos(C*Math.sin(2*t)); const z = R*Math.sin(C*Math.sin(2*t)); const u = 0.5+Math.atan2(z,x)/(2*Math.PI); const v = 0.5-Math.asin(y)/Math.PI; ctx1.beginPath(); ctx1.arc(u*512, v*256, 4, 0, Math.PI*2); ctx1.fill(); }
+            ctx1.save(); ctx1.translate(512*0.75, 256*0.5); ctx1.rotate(45*Math.PI/180); ctx1.font = 'bold 60px "Impact"'; ctx1.textAlign='center'; ctx1.textBaseline='middle'; ctx1.strokeStyle = '#fff'; ctx1.lineWidth=4; ctx1.strokeText('YYC',0,0); ctx1.fillStyle='#000'; ctx1.fillText('YYC',0,0); ctx1.restore();
+            const tex1 = new THREE.CanvasTexture(c1);
+            softballMat = new THREE.MeshPhongMaterial({ map: tex1, color: 0xffffff, specular: 0x333333, shininess: 15, bumpMap: tex1, bumpScale: 0.2 });
+            softballGeo = new THREE.SphereGeometry(BALL_RADIUS, 32, 32);
+
+            // 2. Grenade (Turtle Shell) - V206.14 Update (Bump Map for Texture)
+            const c2 = document.createElement('canvas'); c2.width = 512; c2.height = 256; const ctx2 = c2.getContext('2d');
+            // Background
+            ctx2.fillStyle = '#1a1a1a'; ctx2.fillRect(0,0,512,256); 
+            // Grid Pattern
+            ctx2.strokeStyle = '#333'; ctx2.lineWidth=8;
+            for(let x=0; x<512; x+=40) { ctx2.beginPath(); ctx2.moveTo(x,0); ctx2.lineTo(x,256); ctx2.stroke(); }
+            for(let y=0; y<256; y+=40) { ctx2.beginPath(); ctx2.moveTo(0,y); ctx2.lineTo(512,y); ctx2.stroke(); }
+            // Bumps (Lighter spots for bump map)
+            ctx2.fillStyle = '#444'; 
+            for(let x=20; x<512; x+=40) { for(let y=20; y<256; y+=40) { ctx2.beginPath(); ctx2.arc(x,y,14,0,Math.PI*2); ctx2.fill(); }}
+            
+            // 側面 LOGO (TYC)
+            ctx2.save(); ctx2.translate(256, 128); ctx2.font = 'bold 60px "Impact"'; ctx2.textAlign='center'; ctx2.textBaseline='middle'; ctx2.fillStyle='#fff'; ctx2.fillText('TYC',0,0); ctx2.restore();
+            
+            const tex2 = new THREE.CanvasTexture(c2);
+            // V206.14: 增強 bumpScale 讓凹凸感更明顯
+            grenadeMat = new THREE.MeshStandardMaterial({ map: tex2, color: 0xffffff, roughness: 0.6, metalness: 0.5, bumpMap: tex2, bumpScale: 0.8 });
+            grenadeGeo = new THREE.SphereGeometry(BALL_RADIUS, 32, 32);
+
+            // 3. GL (Capsule Mortar) - V206.14 Update (Primer Detail)
+            // Primer material: Copper
+            glMat = { head: new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.3, metalness: 0.8 }), body: new THREE.MeshStandardMaterial({ color: 0x2f4f4f, roughness: 0.7, metalness: 0.1 }), primer: new THREE.MeshStandardMaterial({ color: 0xB87333, roughness: 0.4, metalness: 0.8 }) };
+            const cGL = document.createElement('canvas'); cGL.width = 256; cGL.height = 128; const ctxGL = cGL.getContext('2d');
+            ctxGL.fillStyle = '#2f4f4f'; ctxGL.fillRect(0,0,256,128); ctxGL.save(); ctxGL.translate(128, 64); ctxGL.rotate(Math.PI/2); ctxGL.font = 'bold 40px "Impact"'; ctxGL.textAlign='center'; ctxGL.textBaseline='middle'; ctxGL.fillStyle='#fff'; ctxGL.fillText('TYC',0,0); ctxGL.restore();
+            glMat.body.map = new THREE.CanvasTexture(cGL);
+
+            // 4. Nuke (Orange Red)
+            const c3 = document.createElement('canvas'); c3.width = 512; c3.height = 256; const ctx3 = c3.getContext('2d');
+            ctx3.fillStyle = '#000'; ctx3.fillRect(0,0,512,256); ctx3.save(); ctx3.translate(256, 128); ctx3.fillStyle='#ff4500';
+            for(let i=0;i<3;i++){ ctx3.beginPath(); ctx3.moveTo(0,0); ctx3.arc(0,0,90,(i*120-30)*Math.PI/180,(i*120+30)*Math.PI/180); ctx3.fill(); }
+            ctx3.beginPath(); ctx3.arc(0,0,25,0,Math.PI*2); ctx3.fill(); ctx3.fillStyle='#000'; ctx3.beginPath(); ctx3.arc(0,0,12,0,Math.PI*2); ctx3.fill();
+            ctx3.font='bold 50px "Impact"'; ctx3.fillStyle='#fff'; ctx3.fillText('TYC',0,0); ctx3.restore();
+            const tex3 = new THREE.CanvasTexture(c3);
+            nukeMat = new THREE.MeshStandardMaterial({ map: tex3, emissive: 0xff4500, emissiveIntensity: 0.5, roughness: 0.4 });
+            nukeGeo = new THREE.SphereGeometry(BALL_RADIUS, 32, 32);
+        }
+
+        // --- Game Logic Functions ---
+
+        function getNukeAmmo() { return parseInt(localStorage.getItem('v136_ammo_nuke') || '0'); }
+        function updateNukeAmmo(amount) {
+            let current = getNukeAmmo(); current += amount; if (current < 0) current = 0;
+            localStorage.setItem('v136_ammo_nuke', current); updateArmoryUI();
+        }
+
+        function getPlayerTotalWins() { return parseInt(localStorage.getItem('v136_total_wins') || '0'); }
+        function incrementPlayerWins() {
+            let wins = getPlayerTotalWins(); wins++; localStorage.setItem('v136_total_wins', wins);
+            if (wins >= 25 && wins % 10 === 0) { if(wins===25) updateNukeAmmo(1); else updateNukeAmmo(1); }
+            return wins;
+        }
+        function getPlayerBadge() {
+            const wins = getPlayerTotalWins();
+            if (wins >= 25) return '👑'; if (wins >= 10) return '🎖️'; if (wins >= 3) return '⭐'; return ''; 
+        }
+        function updatePlayerRankDisplay() {
+            const wins = getPlayerTotalWins();
+            let rankTitle = 'Rookie';
+            if (wins >= 25) rankTitle = 'Titan'; else if (wins >= 10) rankTitle = 'Ace'; else if (wins >= 3) rankTitle = 'Veteran';
+            if(document.getElementById('rank-badge')) document.getElementById('rank-badge').innerText = getPlayerBadge();
+            if(document.getElementById('career-wins')) document.getElementById('career-wins').innerText = wins;
+            if(document.getElementById('career-rank')) document.getElementById('career-rank').innerText = rankTitle;
+            updateArmoryUI();
+        }
+
+        window.selectWeapon = function(type) {
+            const wins = getPlayerTotalWins();
+            if (type === 'grenade' && wins < 0) return; 
+            if (type === 'gl' && wins < 2) return; 
+            if (type === 'nuke') {
+                if (wins < 25) return; 
+                if (getNukeAmmo() <= 0) {
+                    showNotification("核彈庫存不足！(勝場累積)");
+                    return;
+                }
+            }
+            
+            currentWeapon = type;
+            document.querySelectorAll('.weapon-slot').forEach(el => el.classList.remove('active'));
+            
+            if(type === 'standard') document.getElementById('slot-standard').classList.add('active');
+            if(type === 'grenade') document.getElementById('slot-grenade').classList.add('active');
+            if(type === 'gl') document.getElementById('slot-gl').classList.add('active');
+            if(type === 'nuke') document.getElementById('slot-nuke').classList.add('active');
+            
+            const msg = document.getElementById('reload-msg');
+            msg.innerText = type.toUpperCase() + " EQUIPPED";
+            msg.style.opacity = 1;
+            setTimeout(() => { msg.style.opacity = 0; }, 1000);
+            playAirCannonSound();
+        }
+
+        function updateArmoryUI() {
+            const wins = getPlayerTotalWins();
+            const nukeCount = getNukeAmmo();
+            
+            const updateSlot = (id, type, minWins) => {
+                const el = document.getElementById(id);
+                let cls = 'weapon-slot';
+                if (wins < minWins) cls += ' locked';
+                if (currentWeapon === type) cls += ' active';
+                el.className = cls;
+            };
+
+            updateSlot('slot-grenade', 'grenade', 0);
+            updateSlot('slot-gl', 'gl', 2);
+            updateSlot('slot-nuke', 'nuke', 25);
+            
+            let stdCls = 'weapon-slot';
+            if (currentWeapon === 'standard') stdCls += ' active';
+            document.getElementById('slot-standard').className = stdCls;
+            
+            document.getElementById('count-nuke').innerText = nukeCount;
+        }
+
+        function cleanup_arrays() {
+            while(AllMeshes.length > 0) { 
+                var m = AllMeshes.pop(); 
+                if (m) { 
+                    if (m.isBlock) { 
+                        m.geometry.dispose(); 
+                        if (Array.isArray(m.material)) { m.material.forEach(mat => mat.dispose()); } else { m.material.dispose(); }
+                    }
+                    S.remove(m); 
+                } 
+            }
+            while(AllBodies.length > 0) { var b = AllBodies.pop(); if (b) World.remove(b); }
+            while(shockwaves.length > 0) { var s = shockwaves.pop(); s.geometry.dispose(); s.material.dispose(); S.remove(s); }
+        }
+
+        // --- 核心修復：V201 堡壘生成邏輯移植 + Async安全檢查 ---
+        async function create_fortress(source) {
+            gameTimeElapsed = 0;
+            gameTimerInterval = null; shotsFired = 0; isGameRunning = false; isConstructing = true; 
+            hasStartedShooting = false; // Reset shooting flag
+            document.getElementById('status-text-cn').innerText = TEXT_CONFIG.status_building + " 0%"; 
+            cleanup_arrays(); 
+            const PATTERN_MATRIX = MODE_SETTINGS[currentChallengeModeKey].matrix;
+            var baseBoxGeo = new THREE.BoxGeometry(BOX_SIZE, BOX_SIZE, BOX_SIZE);
+            var boxShape = new CANNON.Box(new CANNON.Vec3(BOX_SIZE/2 * 0.99, BOX_SIZE/2 * 0.99, BOX_SIZE/2 * 0.99)); 
+            var offset_x = (WALL_WIDTH_EXTENDED * BOX_SIZE) / 2 - (BOX_SIZE / 2); var offset_z = (WALL_DIM * BOX_SIZE) / 2 - (BOX_SIZE / 2);
+            let initialBlocks = 0;
+            var imageObj = null; var sharedMaterial = null;
+            
+            if (source && typeof source === 'string') { 
+                try { 
+                    var img = new Image(); 
+                    img.src = source; 
+                    await img.decode(); 
+                    imageObj = img; 
+                } catch(e) { 
+                    console.error("Image decode error, fallback to default", e); 
+                    showNotification("自訂圖片載入失敗，使用預設材質");
+                } 
+            }
+            
+            if (imageObj) {
+                var canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512; var ctx = canvas.getContext('2d');
+                var imgRatio = imageObj.width / imageObj.height; var targetRatio = 1; var sx, sy, sWidth, sHeight;
+                if (imgRatio > targetRatio) { sHeight = imageObj.height; sWidth = sHeight * targetRatio; sx = (imageObj.width - sWidth) / 2; sy = 0; } 
+                else { sWidth = imageObj.width; sHeight = sWidth / targetRatio; sx = 0; sy = (imageObj.height - sHeight) / 2; }
+                ctx.filter = 'contrast(1.15) saturate(1.25)'; ctx.drawImage(imageObj, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height); ctx.filter = 'none'; 
+                var tex = new THREE.CanvasTexture(canvas); tex.encoding = THREE.sRGBEncoding; 
+                sharedMaterial = new THREE.MeshStandardMaterial({ map: tex, color: 0xffffff, roughness: 0.8, metalness: 0.1 });
+            }
+            
+            var plainMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.2 });
+            var blockQueue = []; for(var x=0; x<WALL_WIDTH_EXTENDED; x++) { for(var y=0; y<WALL_DIM; y++) { for(var z=0; z<WALL_DIM; z++) { blockQueue.push({x:x, y:y, z:z}); } } }
+            var BATCH_SIZE = 40;
+            var currentIdx = 0;
+
+            function processBatch() {
+                var endIdx = Math.min(currentIdx + BATCH_SIZE, blockQueue.length);
+                for(var i=currentIdx; i<endIdx; i++) {
+                    var bData = blockQueue[i]; var x = bData.x; var y = bData.y; var z = bData.z;
+                    var px = x * BOX_SIZE - offset_x; var py = y * BOX_SIZE + (BOX_SIZE/2); var pz = z * BOX_SIZE - offset_z; var isFront = (z === WALL_DIM - 1); 
+                    var mesh;
+                    if (isFront && sharedMaterial) {
+                        var geometry = baseBoxGeo.clone(); var uvs = geometry.attributes.uv;
+                        for (var k = 0; k < uvs.count; k++) { var u = uvs.getX(k); var v = uvs.getY(k); u = (u + x) / WALL_WIDTH_EXTENDED; v = (v + y) / WALL_DIM; uvs.setXY(k, u, v); }
+                        var mats = [plainMat, plainMat, plainMat, plainMat, sharedMaterial, plainMat]; mesh = new THREE.Mesh(geometry, mats); mesh.isBlock = true;
+                    } else {
+                        if (isFront) {
+                            var color; if (PATTERN_MATRIX[y] && PATTERN_MATRIX[y][x] === 1) color = HEART_COLOR; else color = FILL_COLOR;
+                            mesh = new THREE.Mesh(baseBoxGeo, new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.2 })); mesh.isBlock = true;
+                        } else { 
+                            var shade = Math.random() * 0.2 + 0.3; var backMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(shade, shade, shade), roughness: 0.5, metalness: 0.2 }); mesh = new THREE.Mesh(baseBoxGeo, backMat); if(z >= WALL_DIM - 3) mesh.isBlock = true; 
+                        }
+                    }
+                    mesh.position.set(px, py, pz); mesh.castShadow = true; mesh.receiveShadow = true; S.add(mesh); AllMeshes.push(mesh); if (mesh.isBlock) initialBlocks++;
+                    var body = new CANNON.Body({ mass: BLOCK_MASS }); body.addShape(boxShape); body.position.set(px, py, pz); World.addBody(body); AllBodies.push(body); mesh.userData.physicsBody = body; 
+                }
+                currentIdx = endIdx; var percent = Math.floor((currentIdx / blockQueue.length) * 100); document.getElementById('status-text-cn').innerText = TEXT_CONFIG.status_building + ` ${percent}%`;
+                if (currentIdx < blockQueue.length) { requestAnimationFrame(processBatch); } 
+                else { 
+                    isConstructing = false; 
+                    isGameRunning = true; 
+                    
+                    // V206.18: 設定初始時間
+                    lastInteractionTime = performance.now(); 
+                    levelStartTime = performance.now();
+                    
+                    AllBodies.forEach(b => b.wakeUp()); 
+                    for(let k=0; k<1; k++) { for(var s=0; s<3; s++) World.step(dt); } 
+                    blocksRemaining = initialBlocks; 
+                    document.getElementById('status-text-cn').innerText = TEXT_CONFIG.status_ready; 
+                    updateHUD(); 
+                    setTimeout(() => { document.getElementById('loading-overlay').style.opacity = 0; }, 500);
+                    setTimeout(() => { document.getElementById('loading-overlay').style.display = 'none'; }, 1000);
+                }
+            }
+            processBatch();
+        }
+
+        function checkZoneStatus() {
+            if (!isGameRunning || isConstructing) return;
+            const zoneHalfX = (TARGET_FRAME_VISUAL_COUNT_X * BOX_SIZE * TARGET_FRAME_VISUAL_SCALE) / 2;
+            const zoneHeight = TARGET_BLOCK_COUNT_Y * BOX_SIZE * TARGET_FRAME_VISUAL_SCALE;
+            const zoneHalfZ = (TARGET_FRAME_Z_DEPTH * BOX_SIZE * TARGET_FRAME_VISUAL_SCALE) / 2;
+            let countInside = 0;
+            for (var i = 0; i < AllMeshes.length; i++) {
+                var m = AllMeshes[i];
+                if (m.isBlock && m.userData.physicsBody) {
+                    var pos = m.userData.physicsBody.position;
+                    if (Math.abs(pos.x) < zoneHalfX && Math.abs(pos.z) < zoneHalfZ && pos.y > -BOX_SIZE) { countInside++; }
+                }
+            }
+            blocksRemaining = countInside;
+            updateHUD(); 
+        }
+
+        function updateHUD() {
+            if (isConstructing) return;
+            
+            const timeElapsed = gameTimeElapsed;
+            const minutes = Math.floor(timeElapsed / 60); const seconds = (timeElapsed % 60).toFixed(1); 
+            if (document.getElementById('stats-shots-cn')) document.getElementById('stats-shots-cn').innerText = shotsFired;
+            if (document.getElementById('stats-blocks-cn')) document.getElementById('stats-blocks-cn').innerText = blocksRemaining;
+            if (document.getElementById('stats-timer-cn')) document.getElementById('stats-timer-cn').innerText = `${minutes}:${seconds.toString().padStart(4, '0')}`;
+            
+            if (blocksRemaining <= 0 && isGameRunning) {
+                // V206.20: 通關後不再強制跳轉，讓玩家決定去留
+                
+                const slot = MODE_SETTINGS[currentChallengeModeKey].slot;
+                
+                if (currentChallengeModeKey === 'Heart') {
+                    document.getElementById('status-text-cn').innerText = TEXT_CONFIG.status_practice_done;
+                    document.getElementById('status-text-cn').style.color = "#39FF14";
+                } else if (slot !== 'none') {
+                    if (!document.getElementById('status-text-cn').innerText.includes("完成")) {
+                         incrementPlayerWins();
+                         updatePlayerRankDisplay();
+                    }
+                    
+                    const currentBadge = getPlayerBadge(); 
+                    
+                    // 根據是否在時限內完成，顯示不同訊息
+                    // V206.20: 若超時但清空，仍算完成，只是不解鎖
+                    if (timeElapsed <= CURRENT_UNLOCK_TIME_LIMIT) {
+                        const isAlreadyUnlocked = localStorage.getItem('v136_' + slot) === 'true';
+                        if (!isAlreadyUnlocked) {
+                            document.getElementById('status-text-cn').innerText = `${currentBadge} ${TEXT_CONFIG.status_unlock_success} ${timeElapsed.toFixed(2)}s`; 
+                            document.getElementById('status-text-cn').style.color = "#39FF14"; 
+                            localStorage.setItem('v136_' + slot, 'true'); 
+                            showNotification("新核心已解鎖！");
+                        } else {
+                            document.getElementById('status-text-cn').innerText = `${currentBadge} ${TEXT_CONFIG.status_replay_success} ${timeElapsed.toFixed(2)}s`; 
+                            document.getElementById('status-text-cn').style.color = "#ccffcc"; 
+                        }
+                    } else {
+                        // 超時但清空
+                        document.getElementById('status-text-cn').innerText = "CLEARED (超時)"; 
+                        document.getElementById('status-text-cn').style.color = "#ffccaa"; 
+                    }
+                } else { 
+                    document.getElementById('status-text-cn').innerText = "CLEARED"; 
+                    document.getElementById('status-text-cn').style.color = "#ffccaa"; 
+                }
+            }
+        }
+
+        // --- 核心修復：衝擊波特效邏輯移植 ---
+        function createShockwave(pos) {
+            var sphereWave = new THREE.Mesh(sharedSphereGeo, sharedSphereMat.clone()); 
+            sphereWave.position.copy(pos); 
+            sphereWave.userData = { type: 'wave', scaleSpeed: 2.0, opacitySpeed: 0.03 }; 
+            S.add(sphereWave); shockwaves.push(sphereWave);
+            
+            var ringWave = new THREE.Mesh(sharedRingGeo, sharedRingMat.clone()); 
+            ringWave.position.copy(pos); ringWave.lookAt(C.position); 
+            ringWave.userData = { type: 'ring', scaleSpeed: 3.5, opacitySpeed: 0.04 }; 
+            S.add(ringWave); shockwaves.push(ringWave);
+        }
+
+        // --- Selection & Modal Logic ---
+
+        function showPatternSelection() {
+            if(!document.getElementById('pattern-selection-overlay')) return; 
+            isGameRunning = false; 
+
+            document.getElementById('pattern-selection-overlay').style.display = 'flex'; document.getElementById('pattern-selection-overlay').style.opacity = 1; document.getElementById('hud-panel').style.display = 'none'; document.querySelector('.btn-container').style.display = 'none'; var btnContainer = document.getElementById('pattern-buttons'); btnContainer.innerHTML = ''; 
+            
+            Object.keys(MODE_SETTINGS).forEach((key) => { 
+                const mode = MODE_SETTINGS[key];
+                const group = document.createElement('div');
+                group.className = 'mode-btn-group';
+                const mainBtn = document.createElement('button');
+                mainBtn.className = 'mode-btn-main';
+                mainBtn.innerText = mode.name_cn; 
+                let isUnlocked = mode.slot !== 'none' && localStorage.getItem('v136_' + mode.slot) === 'true';
+                if (mode.slot !== 'none') {
+                    if (isUnlocked) {
+                        mainBtn.onclick = () => {
+                            let savedTex = localStorage.getItem('v136_' + mode.slot + '_texture');
+                            window.startLevel(key, savedTex); 
+                        };
+                        const settingBtn = document.createElement('button');
+                        settingBtn.className = 'mode-btn-setting';
+                        settingBtn.innerHTML = '⚙️'; 
+                        settingBtn.onclick = (e) => {
+                            e.stopPropagation(); 
+                            window.showUploadModal(mode.slot);
+                        };
+                        group.appendChild(mainBtn);
+                        group.appendChild(settingBtn);
+                    } else {
+                        group.classList.add('locked');
+                        mainBtn.innerText += " [LOCKED]";
+                        mainBtn.onclick = () => window.selectPattern(key); 
+                        group.appendChild(mainBtn);
+                    }
+                } else {
+                    mainBtn.onclick = () => window.selectPattern(key);
+                    group.appendChild(mainBtn);
+                }
+                btnContainer.appendChild(group); 
+            });
+            updatePlayerRankDisplay(); 
+        }
+
+        window.selectPattern = function(key) { 
+            currentChallengeModeKey = key; CURRENT_UNLOCK_TIME_LIMIT = MODE_SETTINGS[key].time_s;
+            document.getElementById('pattern-selection-overlay').style.opacity = 0; 
+            setTimeout(() => { 
+                document.getElementById('pattern-selection-overlay').style.display = 'none'; document.getElementById('hud-panel').style.display = 'flex'; document.querySelector('.btn-container').style.display = 'flex'; 
+                let textureBase64 = null; 
+                if (MODE_SETTINGS[key].slot !== 'none' && localStorage.getItem('v136_' + MODE_SETTINGS[key].slot) === 'true') { 
+                    textureBase64 = localStorage.getItem('v136_' + MODE_SETTINGS[key].slot + '_texture'); 
+                }
+                create_fortress(textureBase64); isGameRunning = true; updateHUD(); 
+            }, 500); 
+        };
+
+        window.startLevel = function(key, textureData) {
+            currentChallengeModeKey = key; 
+            CURRENT_UNLOCK_TIME_LIMIT = MODE_SETTINGS[key].time_s;
+            document.getElementById('pattern-selection-overlay').style.display = 'none'; 
+            document.getElementById('hud-panel').style.display = 'flex'; 
+            document.querySelector('.btn-container').style.display = 'flex'; 
+            
+            // V206.20: 暫不設定 start time，等第一發射擊
+            levelStartTime = 0;
+            lastInteractionTime = performance.now();
+            hasStartedShooting = false;
+            
+            create_fortress(textureData); 
+            isGameRunning = true; 
+            updateHUD();
+            updateArmoryUI();
+        };
+
+        window.showUploadModal = function(slotKey) {
+            currentPcoreSlot = slotKey;
+            document.getElementById('upload-modal-overlay').style.display = 'flex';
+            document.getElementById('image-upload-input').value = ''; 
+            document.getElementById('apply-texture-btn').onclick = window.handleApplyTexture;
+            document.getElementById('cancel-upload-btn').onclick = () => {
+                window.hideUploadModal();
+                const modeKey = Object.keys(MODE_SETTINGS).find(k => MODE_SETTINGS[k].slot === slotKey);
+                if (modeKey) {
+                    window.startLevel(modeKey, null); 
+                }
+            };
+        };
+
+        window.hideUploadModal = function() { document.getElementById('upload-modal-overlay').style.display = 'none'; };
+
+        window.handleApplyTexture = function() {
+            const fileInput = document.getElementById('image-upload-input'); const file = fileInput.files[0];
+            if (!file) { showNotification("請選擇一張圖片"); return; }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                localStorage.setItem(`v136_${currentPcoreSlot}_texture`, e.target.result);
+                showNotification(`${currentPcoreSlot} 圖片上傳成功！`);
+                window.hideUploadModal();
+                const modeKey = Object.keys(MODE_SETTINGS).find(k => MODE_SETTINGS[k].slot === currentPcoreSlot);
+                if (modeKey) {
+                    window.startLevel(modeKey, e.target.result);
+                }
+            };
+            reader.readAsDataURL(file);
+        };
+
+        // V206.20 Fix: 手動重置
+        window.resetSimulation = function() { 
+             gameTimeElapsed = 0;
+             gameTimerInterval = null; 
+             shotsFired = 0;
+             hasStartedShooting = false; 
+             levelStartTime = 0; // Reset timer start condition
+             document.getElementById('status-text-cn').innerText = "重置中..."; 
+             
+             setTimeout(() => { 
+                 const mode = MODE_SETTINGS[currentChallengeModeKey]; 
+                 let textureBase64 = null; 
+                 if (mode.slot !== 'none' && localStorage.getItem('v136_' + mode.slot) === 'true') {
+                     textureBase64 = localStorage.getItem('v136_' + mode.slot + '_texture'); 
+                 }
+                 create_fortress(textureBase64); 
+                 document.getElementById('status-text-cn').innerText = TEXT_CONFIG.status_ready; 
+                 isGameRunning = true; 
+                 lastInteractionTime = performance.now(); 
+                 updateHUD(); 
+             }, 100);
+        };
+
+        window.toggleSlowMo = function() {
+            isSlowMo = !isSlowMo; var statusCnEl = document.getElementById('status-text-cn'); var btn = document.getElementById('btn-slow');
+            if (isSlowMo) { statusCnEl.innerText = TEXT_CONFIG.status_slowmo; statusCnEl.style.color = "#00aaff"; btn.classList.add('active'); } else { statusCnEl.innerText = TEXT_CONFIG.status_ready; statusCnEl.style.color = "#fff"; btn.classList.remove('active'); }
+        };
+
+        function showNotification(message) {
+            let notification = document.getElementById('notification-banner');
+            if (!notification) { 
+                notification = document.createElement('div'); 
+                notification.id = 'notification-banner'; 
+                notification.style.cssText = `position: absolute; top: 100px; left: 50%; transform: translateX(-50%); background: #39FF14; color: #1a1a1a; padding: 8px 20px; border-radius: 15px; font-family: "Microsoft JhengHei", sans-serif; font-size: 14px; font-weight: bold; z-index: 1000; opacity: 0; transition: opacity 0.5s, top 0.5s; box-shadow: 0 4px 10px rgba(0,0,0,0.5); pointer-events: none;`; 
+                document.body.appendChild(notification); 
+            }
+            notification.innerText = message; 
+            notification.style.top = '100px'; 
+            notification.style.opacity = '1'; 
+            setTimeout(() => { 
+                notification.style.opacity = '0'; 
+                notification.style.top = '80px'; 
+            }, 3000);
+        }
+
+        // V206.16 暴露 showPatternSelection 供 HTML onclick 使用
+        window.showPatternSelection = showPatternSelection;
+
+        function initAudio() { 
+            var AudioContext = window.AudioContext || window.webkitAudioContext; 
+            if (!AudioContext) return; 
+            if (!audioCtx) audioCtx = new AudioContext(); 
+            if (audioCtx.state === 'suspended') audioCtx.resume(); 
+        }
+        function playAirCannonSound() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.8, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        };
+        function playSound(freq, type, duration, vol) { if (!audioCtx) return; var osc = audioCtx.createOscillator(); var gain = audioCtx.createGain(); osc.type = type || 'sine'; osc.frequency.setValueAtTime(freq, audioCtx.currentTime); gain.gain.setValueAtTime(vol || 0.5, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + duration); }
+        function playImpactSound(velocity) { if(velocity < 0.5) return; var vol = Math.min(velocity / 30, 1.0); playSound(60 + Math.random()*40, 'sawtooth', 0.15, vol); }
+        
+        function setupEvents() { 
+            R.domElement.addEventListener('pointerdown', onPointerDown); 
+            R.domElement.addEventListener('pointerup', onPointerUp); 
+            window.addEventListener('resize', onWindowResize);
+        }
+        
+        // V206.20: Adaptive Camera Zoom (More aggressive zoom for landscape)
+        function onWindowResize() {
+            R.setSize(window.innerWidth,window.innerHeight); 
+            C.aspect=window.innerWidth/window.innerHeight; 
+            C.updateProjectionMatrix();
+            
+            if (window.innerWidth > window.innerHeight && window.innerHeight < 600) {
+                C.position.z = 200; // V206.20: Maintain close zoom
+                C.position.y = 100; 
+            } else {
+                C.position.z = 400; 
+                C.position.y = 150;
+            }
+            C.lookAt(0, 70, 0);
+        }
+        
+        function onPointerDown(e) { 
+            // V206.18: 防呆
+            if (!isGameRunning || isConstructing) return;
+            if(e.target.tagName === 'BUTTON' || e.target.closest('#hud-panel') || e.target.closest('#armory-panel')) return; 
+            
+            // V206.20: 只要有點擊就重置閒置時間
+            lastInteractionTime = performance.now();
+
+            initAudio(); 
+            isPressing = true; 
+            pressStartTime = Date.now(); 
+            document.getElementById('status-text-cn').innerText = TEXT_CONFIG.status_charging; 
+            playSound(150, 'triangle', 0.2, 0.1); 
+        }
+        
+        function onPointerUp(e) {
+            if(e.target.closest('#armory-panel') || e.target.closest('#hud-panel')) return;
+            if(e.target.tagName === 'BUTTON') return;
+            if (!isGameRunning || isConstructing) return;
+            
+            lastInteractionTime = performance.now();
+
+            if (isPressing) {
+                isPressing = false; var duration = Date.now() - pressStartTime; var powerPercent = Math.min((duration / 2000), 1.0); var powerMult = 1 + (powerPercent * (MAX_POWER_MULT - 1)); var mouse = new THREE.Vector2(); mouse.x = (e.clientX / window.innerWidth) * 2 - 1; mouse.y = -(e.clientY / window.innerHeight) * 2 + 1; var isFullPower = powerPercent >= 0.99;
+                
+                // V206.20: 第一發射擊判定
+                if (!hasStartedShooting) {
+                    hasStartedShooting = true;
+                    levelStartTime = performance.now(); // 現在才開始算時間
+                }
+
+                if (currentWeapon === 'nuke') { if (getNukeAmmo() > 0) { updateNukeAmmo(-1); } else { currentWeapon = 'standard'; updateArmoryUI(); } }
+                shootBall(powerMult, mouse, isFullPower); shotsFired++; updateHUD(); playAirCannonSound(); 
+                document.getElementById('power-bar').style.width = '0%'; document.getElementById('status-text-cn').innerText = isSlowMo ? TEXT_CONFIG.status_slowmo : TEXT_CONFIG.status_ready; document.getElementById('status-text-cn').style.color = isSlowMo ? "#00aaff" : "#fff";
+            }
+        }
+        
+        // --- V206.14 核心修正：威力精確設定 + 軸向修正 ---
+        function shootBall(power, mousePos, isFullPower) {
+            var raycaster = new THREE.Raycaster(); raycaster.setFromCamera(mousePos, C);
+            var spawnPos = C.position.clone(); var direction = raycaster.ray.direction.clone().normalize(); spawnPos.add(direction.multiplyScalar(50));
+            if (isFullPower) { createShockwave(spawnPos); }
+            
+            var r = BALL_RADIUS; var ballMesh;
+            
+            if (!softballGeo) {
+                console.warn("Assets not ready, using temp geo");
+                softballGeo = new THREE.SphereGeometry(BALL_RADIUS, 16, 16);
+                softballMat = new THREE.MeshBasicMaterial({color: 0x39FF14});
+            }
+
+            if (currentWeapon === 'gl') {
+                ballMesh = new THREE.Group();
+                var bodyGeo = new THREE.CylinderGeometry(r*0.8, r*0.8, r*2.5, 16); var bodyMesh = new THREE.Mesh(bodyGeo, glMat ? glMat.body : new THREE.MeshBasicMaterial({color:0x2f4f4f})); bodyMesh.position.y = -r * 0.3;
+                var headGeo = new THREE.SphereGeometry(r*0.8, 16, 16, 0, Math.PI*2, 0, Math.PI/2); var headMesh = new THREE.Mesh(headGeo, glMat ? glMat.head : new THREE.MeshBasicMaterial({color:0xffd700})); headMesh.position.y = r * 0.95; 
+                
+                // V206.14 Update: 底火細節 (5.0) + 銅色
+                var primerGeo = new THREE.CylinderGeometry(5.0, 5.0, 0.5, 16); 
+                var primerMesh = new THREE.Mesh(primerGeo, glMat ? glMat.primer : new THREE.MeshStandardMaterial({color:0xB87333}));
+                primerMesh.position.y = -r * 1.55; 
+                primerMesh.rotation.x = 0; 
+                
+                ballMesh.add(bodyMesh); 
+                ballMesh.add(headMesh); 
+                ballMesh.add(primerMesh); 
+                
+                // V206.11 修正：榴彈轉向 Z 軸
+                ballMesh.rotation.x = Math.PI / 2; 
+            } else if (currentWeapon === 'grenade') { 
+                ballMesh = new THREE.Mesh(grenadeGeo || softballGeo, grenadeMat || softballMat); 
+            } else if (currentWeapon === 'nuke') { 
+                ballMesh = new THREE.Mesh(nukeGeo || softballGeo, nukeMat || softballMat); 
+            } else { 
+                ballMesh = new THREE.Mesh(softballGeo, softballMat); 
+            }
+            
+            ballMesh.castShadow = true; ballMesh.receiveShadow = false; S.add(ballMesh); AllMeshes.push(ballMesh); 
+            var shape = new CANNON.Sphere(r + 0.6); var body = new CANNON.Body({ mass: BALL_MASS }); body.addShape(shape); body.position.copy(spawnPos);
+            var speed = SHOOT_SPEED_BASE * power; 
+            
+            body.angularDamping = 0.5;
+
+            if (currentWeapon === 'gl') { speed *= 1.5; body.angularDamping = 0.5; } else if (currentWeapon === 'grenade') { speed *= 0.8; body.angularVelocity.set(Math.random()*10, Math.random()*10, Math.random()*10); } else if (currentWeapon === 'nuke') { speed *= 0.6; body.mass *= 5; } else { body.angularVelocity.set(Math.random()*50, Math.random()*50, Math.random()*50); }
+            
+            speed *= 0.5;
+
+            if (currentWeapon === 'gl') { ballMesh.userData.isProjectile = true; }
+            body.velocity.set(direction.x * speed, direction.y * speed, direction.z * speed); body.linearDamping = 0.01; 
+            
+            const weaponType = currentWeapon; 
+            body.addEventListener("collide", function(e){ 
+                var relativeVelocity = e.contact.getImpactVelocityAlongNormal(); 
+                if(Math.abs(relativeVelocity) > 5) { 
+                    playImpactSound(Math.abs(relativeVelocity)); 
+                    if (weaponType === 'grenade' || weaponType === 'gl' || weaponType === 'nuke') {
+                        // V206.14 修正：威力數值鎖定 (Final Nerf)
+                        let radius = 300; let force = 50; 
+                        
+                        if (weaponType === 'grenade') { radius = 250; force = 200; } // 鎖定 200
+                        if (weaponType === 'gl') { radius = 400; force = 300; } // 鎖定 300
+                        if (weaponType === 'nuke') { radius = 1200; force = 400; } // 鎖定 400
+                        
+                        // 標準球 (Standard) 這裡不觸發 explode，推力相當於物理碰撞
+                        
+                        explode(body.position, radius, force); createShockwave(body.position);
+                        if (weaponType === 'nuke') { var bigWave = shockwaves[shockwaves.length-1]; if(bigWave) { bigWave.scale.set(8,8,8); } }
+                    }
+                } 
+            });
+            
+            if (currentWeapon === 'gl') {
+                var quat = new THREE.Quaternion();
+                quat.setFromUnitVectors(new THREE.Vector3(0,1,0), direction.normalize());
+                ballMesh.quaternion.copy(quat);
+                body.quaternion.copy(quat);
+            }
+
+            World.addBody(body); AllBodies.push(body); ballMesh.userData.physicsBody = body; 
+        }
+
+        function explode(center, radius, force) {
+            AllBodies.forEach(b => { if (b.mass > 0) { const dist = b.position.distanceTo(center); if (dist < radius) { const direction = b.position.vsub(center); direction.normalize(); const impulse = direction.scale(force * (1 - dist/radius)); b.applyImpulse(impulse, b.position); } } });
+        }
+        
+        // Loop Logic
+        var frameCounter = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // V206.20: 閒置檢測優化 - 統一為 15 秒無操作自動返回
+            if (isGameRunning && !isConstructing && currentChallengeModeKey !== 'Heart') {
+                const now = performance.now();
+                
+                // 條件1: 進入關卡但還沒射擊 (15秒)
+                if (!hasStartedShooting && (now - lastInteractionTime > 15000)) {
+                    cleanup_arrays(); showPatternSelection(); return;
+                }
+                // 條件2: 已開始射擊或已通關，但完全無操作 (15秒)
+                if (hasStartedShooting && (now - lastInteractionTime > 15000)) {
+                    cleanup_arrays(); showPatternSelection(); return;
+                }
+            }
+
+            if (isConstructing) { 
+                lastFrameTime = performance.now();
+                R.render(S, C); 
+                return; 
+            }
+            
+            const now = performance.now();
+            if (lastFrameTime === 0) lastFrameTime = now; 
+            const rawDelta = Math.min((now - lastFrameTime) / 1000, 0.1); 
+            lastFrameTime = now;
+
+            // V206.20: 計時器邏輯 - 射擊後才開始，且不因通關停止，直到玩家離開
+            if (isGameRunning && hasStartedShooting && blocksRemaining > 0) {
+                const timeScale = isSlowMo ? (1 / SLOW_FACTOR) : 1.0;
+                gameTimeElapsed += rawDelta * timeScale;
+            }
+
+            if (isPressing) { var duration = Date.now() - pressStartTime; var percent = Math.min((duration / 2000) * 100, 100); document.getElementById('power-bar').style.width = percent + '%'; }
+            
+            // V206.7 Fix: 優化物理步進邏輯 (Physics Stepping)
+            var timeStep = 1/60; 
+            if (World) { 
+                if (isSlowMo) {
+                    World.step(timeStep / SLOW_FACTOR); 
+                } else {
+                    World.step(timeStep, rawDelta, 3);
+                }
+            }
+            
+            frameCounter++;
+            if (isGameRunning && frameCounter % 5 === 0) { 
+                checkZoneStatus();
+                updateHUD(); 
+            }
+
+            for (var k = shockwaves.length - 1; k >= 0; k--) { var sw = shockwaves[k]; sw.scale.multiplyScalar(1 + sw.userData.scaleSpeed * 0.05); sw.material.opacity -= sw.userData.opacitySpeed; if (sw.material.opacity <= 0) { sw.material.dispose(); S.remove(sw); shockwaves.splice(k, 1); } }
+            for (var i = AllMeshes.length - 1; i >= 0; i--) {
+                var m = AllMeshes[i]; var b = m.userData.physicsBody;
+                if (b) {
+                    m.position.copy(b.position); m.quaternion.copy(b.quaternion);
+                    
+                    if (m.userData.isProjectile && b.velocity.lengthSquared() > 1) {
+                        var vel = new THREE.Vector3(b.velocity.x, b.velocity.y, b.velocity.z).normalize();
+                        var quat = new THREE.Quaternion();
+                        quat.setFromUnitVectors(new THREE.Vector3(0,1,0), vel);
+                        m.quaternion.copy(quat);
+                    }
+
+                    if (b.position.y < -200 || Math.abs(b.position.x) > 1100 || Math.abs(b.position.z) > 1100) {
+                        if (m.isBlock) {
+                             if (m.isGroup) { m.traverse(c => { if (c.isMesh) { /* keep shared */ } }); } 
+                             else { m.geometry.dispose(); if (Array.isArray(m.material)) { m.material.forEach(mat => mat.dispose()); } else { m.material.dispose(); } }
+                        }
+                        S.remove(m); AllMeshes.splice(i, 1); if(b) World.remove(b); 
+                    } else if (b.velocity.lengthSquared() < 0.1 && b.position.y < 3 * BOX_SIZE && b.position.y > -100) { if (!b.sleep()) {} }
+                }
+            }
+            R.render(S, C);
+        }
+
+        window.onload = function() { try { init(); } catch (e) { console.error("V206 Init Error:", e); } };
+    </script>
+</body>
+</html>
