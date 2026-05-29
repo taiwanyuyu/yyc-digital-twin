@@ -7,27 +7,29 @@ Industrial Design × Embodied Intelligence × Offline Runtime
 
 ---
 
-## Projects｜專案列表
+### Digital Twin A | 數位分身A版
 
-### Digital Twin A｜數位分身A版
+InkBrain Edition (Ink Aesthetics & Knowledge Archive)
 
-Offline Human Truth Resume System
+A visual and philosophical digital twin inspired by ink aesthetics, reflective thinking, and human-centered knowledge preservation.
 
-離線人類真值履歷系統（水墨版）
+（水墨美學、哲學思維、人類知識保存導向）
 
-Folder：
-[進入A版](https://taiwanyuyu.github.io/yyc-digital-twin/digital-twin-a/)
+Launch:
+[Enter Digital Twin A](https://taiwanyuyu.github.io/yyc-digital-twin/digital-twin-a/)
 
 ---
 
-### Digital Twin B｜數位分身B版
+### Digital Twin B | 數位分身B版
 
-Offline Human Truth Resume System
+BoAi Edition (Empathy & Human-Centered Collaboration)
 
-離線人類真值履歷系統（博愛版）
+A digital twin focused on empathy, public service values, human care, and social collaboration.
 
-Status：
-[進入B版](https://taiwanyuyu.github.io/yyc-digital-twin/digital-twin-b/)
+（博愛精神、人文關懷、社會協作導向）
+
+Launch:
+[Enter Digital Twin B](https://taiwanyuyu.github.io/yyc-digital-twin/digital-twin-b/)
 
 ---
 
@@ -37,8 +39,8 @@ Offline Physics Castle Attack Game
 
 離線物理攻城遊戲
 
-Status：
-[進入Titan Siege](https://taiwanyuyu.github.io/yyc-digital-twin/titan-siege/)
+Launch:
+[Enter Titan Siege](https://taiwanyuyu.github.io/yyc-digital-twin/titan-siege/)
 
 ---
 
@@ -48,8 +50,8 @@ Offline Robot Battle Simulation
 
 離線機器人戰鬥模擬
 
-Status：
-[進入Mazinger Z](https://taiwanyuyu.github.io/yyc-digital-twin/mazinger-z/)
+Launch:
+[Enter Mazinger Z](https://taiwanyuyu.github.io/yyc-digital-twin/mazinger-z/)
 
 ---
 
