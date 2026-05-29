@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>無敵鐵金剛：L9+++ 電競機台版 (Patch 4.2)</title>
+<style>
+    /* --- 全局設定 --- */
+    body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        background-color: #000;
+        font-family: "Microsoft JhengHei", sans-serif;
+        overflow: hidden;
+        padding: 0;
+        box-sizing: border-box;
+        touch-action: none;
+    }
+
+    /* --- 舞台容器 --- */
+    #stage-container {
+        position: relative;
+        width: 100%;
+        max-width: 450px; 
+        height: 100vh; /* 全螢幕 */
+        background: #000;
+        overflow: hidden;
+        perspective: 600px;
+    }
+
+    /* --- UI 儀表板 (改為分散式佈局) --- */
+    /* 移除原本的 top-bar 背景，改讓元素獨立浮動 */
+
+    /* 1. 左上角：模式與計時 (Mode Box) */
+    #game-status-panel {
+        position: absolute;
+        top: 20px; 
+        left: 20px;
+        background: rgba(0, 20, 40, 0.6); /* 半透明 */
+        border-left: 4px solid cyan;
+        padding: 5px 10px;
+        color: white;
+        font-family: monospace;
+        z-index: 50;
+        text-align: left;
+        pointer-events: none;
+    }
+    #mode-display { font-size: 12px; color: cyan; margin-bottom: 2px; }
+    #timer-display { font-size: 24px; color: yellow; font-weight: bold; line-height: 1; }
+
+    /* 2. 右上角：分數板 (Score Box) */
+    #hud-score-box {
+        position: absolute;
+        top: 20px; 
+        right: 20px;
+        text-align: right;
+        z-index: 50;
+        pointer-events: none;
+    }
+    .hud-label { color: rgba(255,255,255,0.7); font-size: 10px; display: block; text-shadow: 1px 1px 2px black; }
+    .hud-value { color: #ff0055; font-size: 24px; font-weight: 900; font-family: monospace; text-shadow: 0 0 10px red, 1px 1px 0 black; }
+    #current-score { color: #ffff00; text-shadow: 0 0 10px yellow, 1px 1px 0 black; }
+
+    /* 3. 左下角：一鍵重來 (Reset Button) */
+    #btn-reset {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        background: rgba(50, 50, 50, 0.5);
+        color: #aaa;
+        border: 1px solid #666;
+        padding: 8px 15px;
+        font-size: 12px;
+        cursor: pointer;
+        z-index: 60;
+        font-family: monospace;
+        transition: 0.2s;
+    }
+    #btn-reset:active { background: #fff; color: #000; }
+
+    /* 4. 底部中央：系統狀態 (Status Bar) */
+    #status-bar {
+        position: absolute;
+        bottom: 20px; left: 50%; transform: translateX(-50%);
+        color: #00ffea;
+        font-family: monospace; font-size: 12px;
+        pointer-events: none; white-space: nowrap;
+        text-shadow: 0 0 5px cyan;
+        z-index: 20;
+        opacity: 0.8;
+    }
+
+    /* --- 3D 隧道背景 --- */
+    .tunnel-wall {
+        position: absolute;
+        background-image: 
+            linear-gradient(90deg, rgba(0, 255, 255, 0.5) 2px, transparent 2px),
+            linear-gradient(180deg, rgba(0, 255, 255, 0.5) 2px, transparent 2px);
+        background-size: 80px 80px;
+        animation: warpSpeed 3s linear infinite;
+        opacity: 0.4;
+        pointer-events: none;
+    }
+    .wall-top { top: -50%; left: -50%; width: 200%; height: 100%; transform-origin: bottom; transform: rotateX(90deg) translateZ(100px); background: linear-gradient(to top, transparent, black); }
+    .wall-bottom { bottom: -50%; left: -50%; width: 200%; height: 100%; transform-origin: top; transform: rotateX(-90deg) translateZ(100px); background: linear-gradient(to bottom, transparent, black); }
+    .wall-left { left: -50%; top: -50%; width: 100%; height: 200%; transform-origin: right; transform: rotateY(90deg) translateZ(100px); background: linear-gradient(to right, black, transparent); }
+    .wall-right { right: -50%; top: -50%; width: 100%; height: 200%; transform-origin: left; transform: rotateY(-90deg) translateZ(100px); background: linear-gradient(to left, black, transparent); }
+    #warp-center { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at 50% 50%, rgba(0,20,40,1) 0%, rgba(0,0,0,0) 70%); z-index: 1; pointer-events: none; }
+    @keyframes warpSpeed { 0% { background-position: 0 0; } 100% { background-position: 0 80px; } }
+
+    svg { display: block; width: 100%; height: 100%; cursor: default; overflow: visible; position: relative; z-index: 10; }
+    
+    .interactive-mode { cursor: crosshair !important; }
+    .interactive-part { transition: filter 0.1s; cursor: pointer; touch-action: manipulation; }
+    .interactive-part:active { filter: brightness(2) sepia(1) hue-rotate(-50deg) saturate(5); }
+
+    /* --- 遊戲選單 --- */
+    #menu-overlay {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        backdrop-filter: blur(8px);
+        transition: opacity 0.5s;
+    }
+
+    .menu-title {
+        color: #fff; font-size: 28px; font-weight: 900; margin-bottom: 30px;
+        text-transform: uppercase; text-shadow: 0 0 15px cyan; font-style: italic;
+    }
+
+    .menu-btn {
+        width: 260px;
+        padding: 15px 0;
+        margin: 10px 0;
+        font-size: 18px; font-weight: bold; color: #000;
+        background: linear-gradient(90deg, #00ffff, #0088ff);
+        border: 2px solid #fff;
+        transform: skew(-15deg);
+        cursor: pointer;
+        box-shadow: 5px 5px 0 rgba(255,255,255,0.3);
+        transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .menu-btn:active { transform: skew(-15deg) translate(2px, 2px); box-shadow: 2px 2px 0 rgba(255,255,255,0.3); }
+    .btn-secondary { background: linear-gradient(90deg, #ffcc00, #ff8800); }
+    .btn-tertiary { background: linear-gradient(90deg, #ff0055, #990033); color: white; }
+
+    .challenge-settings {
+        margin-top: 5px;
+        background: rgba(255,255,255,0.1);
+        padding: 10px;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: white;
+        font-size: 14px;
+    }
+    input[type=range] { accent-color: #ff0055; }
+
+    /* --- 結算畫面 --- */
+    #result-modal {
+        position: absolute;
+        top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: 80%;
+        background: rgba(0, 20, 40, 0.95);
+        border: 4px solid #ffd700;
+        padding: 20px;
+        text-align: center;
+        z-index: 200;
+        display: none;
+        box-shadow: 0 0 50px rgba(255, 215, 0, 0.5);
+    }
+    .crown-icon { font-size: 50px; display: block; margin-bottom: 10px; animation: bounce 1s infinite; }
+    @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    .winner-text { color: #ffd700; font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+    .score-text { color: white; font-size: 18px; margin-bottom: 20px; }
+    
+    /* --- SVG 動畫定義 --- */
+    #left-jet { transform-origin: 170px 490px; }
+    #right-jet { transform-origin: 230px 490px; }
+    #pilder-jet { transform-origin: 200px 55px; }
+    #fire-wave { transform-origin: 200px 180px; }
+    #missile-launcher { transform: translate(200px, 260px); }
+
+    @keyframes pilderDockMove { 0% { transform: translateY(-400px) scale(0.8); opacity: 0; } 40% { transform: translateY(-100px) scale(1); opacity: 1; } 60% { transform: translateY(-100px) scale(1); } 100% { transform: translateY(0); } }
+    .anim-pilder-dock-move { display: block !important; animation: pilderDockMove 0.8s ease-out forwards; }
+    @keyframes jetPilderDockAnim { 0% { opacity: 0; transform: scaleY(0); } 10% { opacity: 1; transform: scaleY(1.5); } 40% { opacity: 1; transform: scaleY(1.2); } 90% { opacity: 0.5; transform: scaleY(0.5); } 100% { opacity: 0; transform: scaleY(0); } }
+    .jet-pilder-dock { display: block !important; animation: jetPilderDockAnim 0.8s ease-out forwards; }
+    @keyframes wingFoldLeft { 0% { transform: rotate(0deg); } 60% { transform: rotate(90deg); } 100% { transform: rotate(90deg); } }
+    .anim-wing-fold-left { animation: wingFoldLeft 0.8s ease-out forwards; transform-origin: 185px 45px; }
+    @keyframes wingFoldRight { 0% { transform: rotate(0deg); } 60% { transform: rotate(-90deg); } 100% { transform: rotate(-90deg); } }
+    .anim-wing-fold-right { animation: wingFoldRight 0.8s ease-out forwards; transform-origin: 215px 45px; }
+    @keyframes scranderFlyIn { 0% { transform: translate(0, 400px) scale(0.5); opacity: 0; } 100% { transform: translate(0, 0) scale(1); opacity: 1; } }
+    .anim-scrander-cross { display: block !important; animation: scranderFlyIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+    @keyframes flySequence { 0% { transform: translateY(0); } 10% { transform: translateY(40px); } 15% { transform: translateY(40px); } 45% { transform: translateY(-900px); } 65% { transform: translateY(-900px); } 100% { transform: translateY(0); } }
+    .anim-takeoff { animation: flySequence 1.7s ease-in-out forwards; }
+    @keyframes landShock { 0% {transform:translateY(0);} 50%{transform:translateY(15px);} 100%{transform:translateY(0);} }
+    .anim-landing { animation: landShock 0.3s ease-out; }
+    @keyframes jetTakeoffAnim { 0% { opacity: 0; transform: scaleY(0); } 10% { opacity: 0.8; transform: scaleY(0.5); } 15% { opacity: 1; transform: scaleY(3.0); } 45% { opacity: 1; transform: scaleY(2.5); } 70% { opacity: 1; transform: scaleY(1.8); } 100% { opacity: 0; transform: scaleY(0); } }
+    .jet-takeoff { display: block !important; animation: jetTakeoffAnim 1.7s ease-in-out forwards; }
+    @keyframes pilderHover { 0% { transform: translateY(0); } 20% { transform: translateY(-120px) rotate(5deg); } 50% { transform: translateY(-130px) rotate(-5deg); } 80% { transform: translateY(-120px) rotate(5deg); } 100% { transform: translateY(0); } }
+    .anim-pilder-fly { animation: pilderHover 2.5s ease-in-out; }
+    @keyframes jetPilderFlyAnim { 0% { opacity: 0; transform: scaleY(0); } 10% { opacity: 1; transform: scaleY(1.5); } 50% { opacity: 1; transform: scaleY(1.2); } 100% { opacity: 0; transform: scaleY(0); } }
+    .jet-pilder-fly { display: block !important; animation: jetPilderFlyAnim 2.5s ease-in-out; }
+    @keyframes scranderFlyOff { 0% { transform: translateY(0); opacity: 1; } 20% { transform: translateY(20px); } 100% { transform: translateY(-600px); opacity: 0; } }
+    .anim-scrander-off { animation: scranderFlyOff 1.5s ease-in forwards; }
+    @keyframes jetScranderAnim { 0% { opacity: 0; transform: scaleY(0); } 20% { opacity: 1; transform: scaleY(2.5); } 100% { opacity: 0; transform: scaleY(0); } }
+    .jet-scrander-active { display: block !important; animation: jetScranderAnim 1.5s ease-out forwards; }
+    @keyframes rocketPunchUp { 0% { transform: translate(0,0) rotate(0deg); } 15% { transform: translate(0, -20px) rotate(0deg); } 35% { transform: translate(0, 10px) rotate(0deg); } 60% { transform: translate(0, -800px) rotate(0deg); } 100% { transform: translate(0, 0) rotate(0deg); } }
+    .punching-up { animation: rocketPunchUp 1.8s ease-in-out; }
+    @keyframes flyJumpBody { 0% { transform: translateY(0); } 10% { transform: translateY(20px); } 40% { transform: translateY(-600px); } 60% { transform: translateY(-600px); } 100% { transform: translateY(0); } }
+    .anim-fly-jump { animation: flyJumpBody 2s ease-in-out; }
+    @keyframes jetFlyJumpAnim { 0% { opacity: 0; transform: scaleY(0); } 10% { opacity: 1; transform: scaleY(0.5); } 15% { opacity: 1; transform: scaleY(2.5); } 40% { opacity: 1; transform: scaleY(2.0); } 60% { opacity: 1; transform: scaleY(1.5); } 90% { opacity: 0.8; transform: scaleY(0.8); } 100% { opacity: 0; transform: scaleY(0); } }
+    .jet-fly-jump { display: block !important; animation: jetFlyJumpAnim 2s ease-in-out; }
+    .pose-fire-mode #left-arm { transform-box: fill-box; transform-origin: 20% 20%; transform: rotate(130deg) translate(10px, -20px); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    .pose-fire-mode #right-arm { transform-box: fill-box; transform-origin: 80% 20%; transform: rotate(-130deg) translate(-10px, -20px); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    @keyframes breastFireFull { 0% { opacity: 0; transform: scale(0.1); } 20% { opacity: 1; transform: scale(1.5); fill: red; } 50% { opacity: 1; transform: scale(2.0); fill: yellow; filter: drop-shadow(0 0 20px red); } 80% { opacity: 1; transform: scale(1.5); fill: red; } 100% { opacity: 0; transform: scale(0.1); } }
+    .fire-active { animation: breastFireFull 2.5s ease-out; transform-origin: top center; }
+    @keyframes missileChaosAnim { 
+        0% { opacity: 1; transform: translate(0, 0) scale(1); } 
+        20% { transform: translate(0, 0) scale(3.5); } 
+        30% { transform: translate(var(--rX1), var(--rY1)) scale(2) rotate(45deg); } 
+        50% { transform: translate(var(--rX2), var(--rY2)) scale(1.5) rotate(180deg); } 
+        75% { transform: translate(var(--rX3), var(--rY3)) scale(1.2) rotate(270deg); } 
+        90% { transform: translate(var(--rX3), var(--rY3)) scale(2); opacity: 1; fill: red; } 
+        100% { transform: translate(var(--rX3), var(--rY3)) scale(5); opacity: 0; fill: yellow; } 
+    }
+    .missile-active { display: block !important; animation: missileChaosAnim 2s linear forwards; }
+    @keyframes beamSweep { 0% { opacity:0; transform: rotate(-20deg) scaleY(0); } 10% { opacity:1; transform: rotate(-20deg) scaleY(1); height: 800px; } 50% { opacity:1; transform: rotate(20deg) scaleY(1); height: 800px; } 90% { opacity:1; transform: rotate(-20deg) scaleY(1); height: 800px; } 100% { opacity:0; transform: rotate(0deg) scaleY(0); } }
+    .beam-active { display: block !important; animation: beamSweep 1.5s linear; transform-origin: top center; }
+    @keyframes lightningSweepLeft { 0% { opacity: 0; transform: rotate(0deg) scale(0); } 10% { opacity: 1; transform: rotate(0deg) scale(1); } 50% { opacity: 1; transform: rotate(120deg) scale(1.5); } 90% { opacity: 1; transform: rotate(120deg) scale(1.5); } 100% { opacity: 0; transform: rotate(120deg) scale(0); } }
+    @keyframes lightningSweepRight { 0% { opacity: 0; transform: rotate(0deg) scale(0); } 10% { opacity: 1; transform: rotate(0deg) scale(1); } 50% { opacity: 1; transform: rotate(-120deg) scale(1.5); } 90% { opacity: 1; transform: rotate(-120deg) scale(1.5); } 100% { opacity: 0; transform: rotate(-120deg) scale(0); } }
+    .lightning-left-active { display: block !important; animation: lightningSweepLeft 1.5s ease-out; transform-origin: 130px 100px; }
+    .lightning-right-active { display: block !important; animation: lightningSweepRight 1.5s ease-out; transform-origin: 270px 100px; }
+
+</style>
+</head>
+<body>
+
+    <!-- 舞台 -->
+    <div id="stage-container">
+        <div class="tunnel-wall wall-top"></div>
+        <div class="tunnel-wall wall-bottom"></div>
+        <div class="tunnel-wall wall-left"></div>
+        <div class="tunnel-wall wall-right"></div>
+        <div id="warp-center"></div>
+        
+        <!-- 遊戲選單 -->
+        <div id="menu-overlay">
+            <div class="menu-title">SELECT MISSION</div>
+            <button class="menu-btn" onclick="GameEngine.startFreeMode()">自由演武 (FREE)</button>
+            <button class="menu-btn btn-secondary" onclick="GameEngine.startBattleMode()">雙人對決 (1 VS 1)</button>
+            <div class="challenge-group">
+                <button class="menu-btn btn-tertiary" onclick="GameEngine.startChallengeMode()">積分挑戰 (RANK)</button>
+                <div class="challenge-settings">
+                    <span>TIME:</span>
+                    <input type="range" id="time-select" min="1" max="3" value="1" oninput="document.getElementById('time-val').innerText = this.value + ' MIN'">
+                    <span id="time-val">1 MIN</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 1. 左上角：狀態面板 -->
+        <div id="game-status-panel">
+            <div id="mode-display">MODE: FREE</div>
+            <div id="timer-display">--:--</div>
+        </div>
+
+        <!-- 2. 右上角：分數面板 -->
+        <div id="hud-score-box">
+            <span class="hud-label">HIGHSCORE: <span id="high-score-val">0</span></span>
+            <span class="hud-label" id="champion-display">CHAMPION: NONE</span>
+            <span class="hud-value" id="current-score">0000</span>
+        </div>
+
+        <!-- 3. 左下角：重置按鈕 -->
+        <button id="btn-reset" onclick="GameEngine.returnToMenu()">RESTART</button>
+
+        <!-- 4. 底部：狀態文字 -->
+        <div id="status-bar">AWAITING SYSTEM START...</div>
+
+        <!-- 結算畫面 -->
+        <div id="result-modal">
+            <div class="crown-icon">👑</div>
+            <div class="winner-text" id="winner-text">WINNER: P1</div>
+            <div class="score-text" id="end-score-text">SCORE: 1200</div>
+            <button class="menu-btn" onclick="GameEngine.returnToMenu()">BACK TO MENU</button>
+        </div>
+
+        <svg viewBox="0 0 400 650" id="robot-stage">
+            <defs>
+                <filter id="glow"><feGaussianBlur stdDeviation="3" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                <linearGradient id="beam-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:white;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:red;stop-opacity:0" />
+                </linearGradient>
+            </defs>
+
+            <g id="scrander" style="display:none;" class="interactive-part" onclick="handleInteract('scranderFly')">
+                <path d="M0,200 L140,180 L260,180 L400,200 L380,250 L240,220 L160,220 L20,250 Z" fill="#cc0000" stroke="black" stroke-width="2" />
+                <path d="M190,140 L210,140 L200,220 Z" fill="#cc0000" stroke="black" stroke-width="2" />
+                <polygon id="scrander-jet-left" points="90,230 110,230 100,270" fill="orange" stroke="red" stroke-width="1" style="display:none;" />
+                <polygon id="scrander-jet-right" points="290,230 310,230 300,270" fill="orange" stroke="red" stroke-width="1" style="display:none;" />
+            </g>
+
+            <g id="whole-robot">
+                <g id="left-leg-group" class="interactive-part" onclick="handleInteract('jump')">
+                    <rect x="145" y="320" width="50" height="70" fill="#222" stroke="black" stroke-width="3" />
+                    <polygon points="140,390 200,390 210,490 130,490" fill="#0055af" stroke="black" stroke-width="3" />
+                    <polygon id="left-jet" points="150,490 190,490 170,580" fill="orange" stroke="red" stroke-width="2" style="display:none;" />
+                </g>
+                <g id="right-leg-group" class="interactive-part" onclick="handleInteract('jump')">
+                    <rect x="205" y="320" width="50" height="70" fill="#222" stroke="black" stroke-width="3" />
+                    <polygon points="200,390 260,390 270,490 190,490" fill="#0055af" stroke="black" stroke-width="3" />
+                    <polygon id="right-jet" points="210,490 250,490 230,580" fill="orange" stroke="red" stroke-width="2" style="display:none;" />
+                </g>
+
+                <g id="left-arm" class="interactive-part" onclick="handleInteract('punchLeft')">
+                    <rect x="80" y="150" width="60" height="120" fill="#0055af" stroke="black" stroke-width="3" />
+                    <rect x="80" y="270" width="60" height="40" fill="#222" stroke="black" stroke-width="3" />
+                </g>
+                <g id="right-arm" class="interactive-part" onclick="handleInteract('punchRight')">
+                    <rect x="260" y="150" width="60" height="120" fill="#0055af" stroke="black" stroke-width="3" />
+                    <rect x="260" y="270" width="60" height="40" fill="#222" stroke="black" stroke-width="3" />
+                </g>
+
+                <rect x="140" y="140" width="120" height="180" fill="#222" stroke="black" stroke-width="3" />
+                <circle id="belly" class="interactive-part" cx="200" cy="260" r="15" fill="orange" stroke="black" stroke-width="2" onclick="handleInteract('missile')" />
+                
+                <g id="missile-launcher" transform="translate(200, 260)">
+                     <g id="missile-projectile" style="display:none;">
+                        <path d="M-10,-20 L10,-20 L10,20 L-10,20 Z" fill="orange" stroke="black" />
+                        <path d="M-10,-20 L0,-35 L10,-20 Z" fill="red" stroke="black" />
+                    </g>
+                </g>
+
+                <g id="breast-group" onclick="handleInteract('fire')">
+                    <polygon id="breast-plate" class="interactive-part" 
+                             points="140,150 180,150 200,190 220,150 260,150 200,240" 
+                             fill="#d32f2f" stroke="black" stroke-width="2" />
+                    <g id="fire-rotator" transform="rotate(0, 200, 180)">
+                         <path id="fire-wave" d="M200,180 L0,600 L400,600 Z" fill="url(#beam-grad)" style="opacity:0; pointer-events:none;" />
+                    </g>
+                </g>
+
+                <g id="head-group" class="interactive-part">
+                    <path onclick="handleInteract('beam')" d="M160,140 L160,80 L180,50 L220,50 L240,80 L240,140 Z" fill="silver" stroke="black" stroke-width="3" />
+                    <polygon id="ear-left" points="160,90 130,100 160,110" fill="yellow" stroke="black" stroke-width="1" class="interactive-part" onclick="handleInteract('earLightning')" />
+                    <polygon id="ear-right" points="240,90 270,100 240,110" fill="yellow" stroke="black" stroke-width="1" class="interactive-part" onclick="handleInteract('earLightning')" />
+                    <path id="lightning-left" d="M130,100 L110,100 L100,120 L80,90 L60,110 L40,80" fill="none" stroke="yellow" stroke-width="3" style="display:none; filter:url(#glow);" />
+                    <path id="lightning-right" d="M270,100 L290,100 L300,120 L320,90 L340,110 L360,80" fill="none" stroke="yellow" stroke-width="3" style="display:none; filter:url(#glow);" />
+
+                    <rect onclick="handleInteract('beam')" x="180" y="80" width="40" height="40" fill="#444" />
+                    <rect id="beam-left" x="188" y="95" width="4" height="0" fill="yellow" style="display:none; filter:url(#glow);" />
+                    <rect id="beam-right" x="208" y="95" width="4" height="0" fill="yellow" style="display:none; filter:url(#glow);" />
+                    <ellipse id="eye-left" cx="190" cy="95" rx="8" ry="5" fill="#333" onclick="handleInteract('beam')" />
+                    <ellipse id="eye-right" cx="210" cy="95" rx="8" ry="5" fill="#333" onclick="handleInteract('beam')" />
+                    
+                    <g id="pilder" style="display:none;" onclick="handleInteract('pilderFly')" class="interactive-part">
+                        <rect x="185" y="40" width="30" height="15" fill="white" stroke="red" stroke-width="2" />
+                        <path d="M190,30 C 190,20 210,20 210,30 Z" fill="white" stroke="black" stroke-width="1" />
+                        <path d="M185,40 L175,30 L225,30 L215,40 Z" fill="red" stroke="black" />
+                        <rect id="pilder-wing-left" x="155" y="42" width="30" height="10" fill="red" stroke="black" stroke-width="1" />
+                        <rect id="pilder-wing-right" x="215" y="42" width="30" height="10" fill="red" stroke="black" stroke-width="1" />
+                        <polygon id="pilder-jet" points="195,55 205,55 200,75" fill="cyan" stroke="white" stroke-width="1" style="display:none;" />
+                    </g>
+                </g>
+            </g>
+        </svg>
+
+    </div>
+
+    <script>
+        // --- 遊戲引擎核心 (GameEngine) ---
+        const GameEngine = {
+            state: 'menu', // menu, free, battle_p1, battle_p2, challenge
+            score: 0,
+            timer: 0,
+            timerInterval: null,
+            battleScores: { p1: 0, p2: 0 },
+            
+            init: function() {
+                this.loadHighScore();
+                initAudio();
+            },
+
+            loadHighScore: function() {
+                const saved = localStorage.getItem('mazinger_highscore');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    document.getElementById('high-score-val').innerText = data.score;
+                    document.getElementById('champion-display').innerText = "CHAMPION: " + data.name;
+                }
+            },
+
+            saveHighScore: function(score) {
+                const saved = localStorage.getItem('mazinger_highscore');
+                let currentHigh = 0;
+                if (saved) currentHigh = JSON.parse(saved).score;
+
+                if (score > currentHigh) {
+                    const name = prompt("NEW RECORD! ENTER YOUR NAME:", "PILOT");
+                    if (name) {
+                        localStorage.setItem('mazinger_highscore', JSON.stringify({ name: name, score: score }));
+                        this.loadHighScore();
+                    }
+                }
+            },
+
+            startFreeMode: function() {
+                this.state = 'free';
+                this.resetUI();
+                startSequence(); // 播放開場動畫
+                this.updateStatusPanel("FREE MODE", "∞");
+            },
+
+            startBattleMode: function() {
+                // P1 先攻
+                this.battleScores = { p1: 0, p2: 0 };
+                this.startRound('battle_p1');
+            },
+
+            startRound: function(roundType) {
+                this.state = roundType;
+                this.score = 0;
+                this.timer = 60; // 1分鐘
+                this.resetUI();
+                
+                const player = roundType === 'battle_p1' ? "PLAYER 1" : "PLAYER 2";
+                alert(`${player} READY? (1 MINUTE)`);
+                
+                startSequence(); // 開場
+                
+                // 等待開場動畫結束後 (3s) 再開始計時
+                setTimeout(() => {
+                    this.startTimer(() => {
+                        this.endBattleRound();
+                    });
+                }, 3000);
+            },
+
+            endBattleRound: function() {
+                if (this.state === 'battle_p1') {
+                    this.battleScores.p1 = this.score;
+                    alert(`P1 FINISHED! SCORE: ${this.score}\nNEXT: PLAYER 2`);
+                    this.startRound('battle_p2');
+                } else {
+                    this.battleScores.p2 = this.score;
+                    this.showBattleResult();
+                }
+            },
+
+            showBattleResult: function() {
+                const p1 = this.battleScores.p1;
+                const p2 = this.battleScores.p2;
+                let winner = "DRAW";
+                if (p1 > p2) winner = "PLAYER 1";
+                if (p2 > p1) winner = "PLAYER 2";
+
+                document.getElementById('winner-text').innerText = `WINNER: ${winner}`;
+                document.getElementById('end-score-text').innerText = `P1: ${p1}  vs  P2: ${p2}`;
+                document.getElementById('result-modal').style.display = 'block';
+            },
+
+            startChallengeMode: function() {
+                const mins = document.getElementById('time-select').value;
+                this.state = 'challenge';
+                this.score = 0;
+                this.timer = mins * 60;
+                this.resetUI();
+                
+                startSequence();
+                
+                setTimeout(() => {
+                    this.startTimer(() => {
+                        this.endChallenge();
+                    });
+                }, 3000);
+            },
+
+            endChallenge: function() {
+                document.getElementById('winner-text').innerText = "TIME UP!";
+                document.getElementById('end-score-text').innerText = `FINAL SCORE: ${this.score}`;
+                document.getElementById('result-modal').style.display = 'block';
+                this.saveHighScore(this.score);
+            },
+
+            startTimer: function(onComplete) {
+                clearInterval(this.timerInterval);
+                this.updateStatusPanel(this.state.toUpperCase(), this.formatTime(this.timer));
+                
+                this.timerInterval = setInterval(() => {
+                    this.timer--;
+                    this.updateStatusPanel(null, this.formatTime(this.timer));
+                    if (this.timer <= 0) {
+                        clearInterval(this.timerInterval);
+                        onComplete();
+                    }
+                }, 1000);
+            },
+
+            addScore: function(points) {
+                if (this.state === 'menu') return;
+                this.score += points;
+                document.getElementById('current-score').innerText = this.score.toString().padStart(4, '0');
+            },
+
+            resetUI: function() {
+                document.getElementById('menu-overlay').style.display = 'none';
+                document.getElementById('result-modal').style.display = 'none';
+                document.getElementById('game-status-panel').style.display = 'block';
+                document.getElementById('current-score').innerText = "0000";
+            },
+
+            returnToMenu: function() {
+                location.reload(); // 最簡單的重置方式
+            },
+
+            updateStatusPanel: function(mode, time) {
+                if (mode) document.getElementById('mode-display').innerText = `MODE: ${mode}`;
+                if (time) document.getElementById('timer-display').innerText = time;
+            },
+
+            formatTime: function(seconds) {
+                const m = Math.floor(seconds / 60);
+                const s = seconds % 60;
+                return `${m}:${s.toString().padStart(2, '0')}`;
+            }
+        };
+
+        // --- 原有變數 ---
+        const statusText = document.getElementById('status-bar');
+        const startOverlay = document.getElementById('start-overlay');
+        const stage = document.getElementById('robot-stage');
+        const pilder = document.getElementById('pilder');
+        const pilderWingL = document.getElementById('pilder-wing-left');
+        const pilderWingR = document.getElementById('pilder-wing-right');
+        const pilderJet = document.getElementById('pilder-jet');
+        const scrander = document.getElementById('scrander');
+        const scranderJetL = document.getElementById('scrander-jet-left');
+        const scranderJetR = document.getElementById('scrander-jet-right');
+        const wholeRobot = document.getElementById('whole-robot');
+        const leftJet = document.getElementById('left-jet');
+        const rightJet = document.getElementById('right-jet');
+        const eyeLeft = document.getElementById('eye-left');
+        const eyeRight = document.getElementById('eye-right');
+        const beamLeft = document.getElementById('beam-left');
+        const beamRight = document.getElementById('beam-right');
+        const fireWave = document.getElementById('fire-wave');
+        const fireRotator = document.getElementById('fire-rotator');
+        const missileProj = document.getElementById('missile-projectile');
+        const lightningL = document.getElementById('lightning-left');
+        const lightningR = document.getElementById('lightning-right');
+
+        let isInteractive = false; // 控制是否可操作機器人 (開場動畫中鎖定)
+        let audioCtx = null;
+
+        // --- 初始化 ---
+        window.onload = function() {
+            GameEngine.init();
+        };
+
+        // --- Audio (Web Audio API) ---
+        function initAudio() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            } catch (e) {}
+        }
+
+        function playTone(freq, duration, type = 'square') {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            try {
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch(e){}
+        }
+
+        function playThemeSong() {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            const notes = [
+                {f: 392, t: 0}, {f: 392, t: 0.2}, {f: 392, t: 0.4},
+                {f: 523, t: 0.8}, {f: 523, t: 1.2},
+                {f: 587, t: 1.6}, {f: 622, t: 2.0},
+                {f: 587, t: 2.4}, {f: 523, t: 2.8},
+                {f: 466, t: 3.2},
+                {f: 523, t: 4.0}, {f: 392, t: 4.4},
+                {f: 349, t: 4.8},
+                {f: 523, t: 6.0}, {f: 784, t: 6.5}
+            ];
+            notes.forEach(n => {
+                try {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.value = n.f;
+                    gain.gain.setValueAtTime(0.1, now + n.t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + n.t + 0.3);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now + n.t);
+                    osc.stop(now + n.t + 0.3);
+                } catch(e){}
+            });
+        }
+        
+        function playSFX(type) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            try {
+                if (type === 'jump' || type === 'takeoff') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(100, now);
+                    osc.frequency.exponentialRampToValueAtTime(50, now + 0.5);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.5);
+                } else if (type === 'beam' || type === 'spark') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(800, now);
+                    osc.frequency.exponentialRampToValueAtTime(100, now + 0.3);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                } else if (type === 'fire' || type === 'explode') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(50, now);
+                    osc.frequency.linearRampToValueAtTime(20, now + 1.0);
+                    gain.gain.setValueAtTime(0.4, now);
+                    gain.gain.linearRampToValueAtTime(0, now + 1.0);
+                }
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(now + 1.0);
+            } catch(e){}
+        }
+
+
+        function startSequence() {
+            // 1. 指揮艇極速飛入
+            pilder.style.display = 'block';
+            pilder.classList.add('anim-pilder-dock-move');
+            animatePart('pilder-jet', 'jet-pilder-dock', 800);
+            pilderWingL.classList.add('anim-wing-fold-left');
+            pilderWingR.classList.add('anim-wing-fold-right');
+            
+            playThemeSong();
+
+            setTimeout(() => {
+                updateStatus("SCRANDER CROSS");
+                scrander.style.display = 'block';
+                scrander.classList.add('anim-scrander-cross');
+                eyeLeft.style.fill = "yellow"; eyeRight.style.fill = "yellow";
+                playSFX('beam');
+            }, 800);
+
+            setTimeout(() => {
+                updateStatus("MAZIN GO!");
+                wholeRobot.classList.add('anim-takeoff');
+                leftJet.classList.add('jet-takeoff');
+                rightJet.classList.add('jet-takeoff');
+                playSFX('takeoff');
+            }, 1300);
+
+            setTimeout(() => {
+                updateStatus("READY");
+                wholeRobot.classList.remove('anim-takeoff');
+                wholeRobot.classList.add('anim-landing');
+                leftJet.classList.remove('jet-takeoff');
+                rightJet.classList.remove('jet-takeoff');
+                playSFX('jump');
+
+                document.getElementById('robot-stage').classList.add('interactive-mode');
+                isInteractive = true; // 解鎖操控
+                
+            }, 3000);
+        }
+
+        function handleInteract(action) {
+            if (!isInteractive) return;
+            event.stopPropagation(); 
+
+            // 記分邏輯
+            const points = 100;
+            GameEngine.addScore(points);
+
+            switch(action) {
+                case 'pilderFly':
+                    updateStatus("PILDER OFF!");
+                    animatePart('pilder', 'anim-pilder-fly', 2500);
+                    animatePart('pilder-jet', 'jet-pilder-fly', 2500);
+                    playSFX('jump');
+                    break;
+                case 'scranderFly':
+                    updateStatus("SCRANDER OFF!");
+                    animatePart('scrander', 'anim-scrander-off', 1500);
+                    animatePart('scrander-jet-left', 'jet-scrander-active', 1500);
+                    animatePart('scrander-jet-right', 'jet-scrander-active', 1500);
+                    playSFX('takeoff');
+                    setTimeout(() => { scrander.style.display = 'none'; }, 1500);
+                    break;
+                case 'punchLeft':
+                    updateStatus("ROCKET PUNCH (L)!");
+                    animatePart('left-arm', 'punching-up', 1800);
+                    playSFX('takeoff');
+                    break;
+                case 'punchRight':
+                    updateStatus("ROCKET PUNCH (R)!");
+                    animatePart('right-arm', 'punching-up', 1800);
+                    playSFX('takeoff');
+                    break;
+                case 'beam':
+                    updateStatus("PHOTON BEAM!");
+                    beamLeft.classList.add('beam-active');
+                    beamRight.classList.add('beam-active');
+                    playSFX('beam');
+                    setTimeout(() => {
+                        beamLeft.classList.remove('beam-active');
+                        beamRight.classList.remove('beam-active');
+                        resetStatus();
+                    }, 1500);
+                    break;
+                case 'earLightning':
+                    updateStatus("THUNDER RADAR!");
+                    animatePart('lightning-left', 'lightning-left-active', 1500);
+                    animatePart('lightning-right', 'lightning-right-active', 1500);
+                    playSFX('spark');
+                    break;
+                case 'fire':
+                    updateStatus("BREAST FIRE!!!!");
+                    const randomAngle = Math.random() * 60 - 30; 
+                    fireRotator.setAttribute("transform", `rotate(${randomAngle}, 200, 180)`);
+                    wholeRobot.classList.add('pose-fire-mode');
+                    fireWave.classList.add('fire-active');
+                    playSFX('fire');
+                    setTimeout(() => {
+                        wholeRobot.classList.remove('pose-fire-mode');
+                        fireWave.classList.remove('fire-active');
+                        fireRotator.setAttribute("transform", `rotate(0, 200, 180)`);
+                        resetStatus();
+                    }, 2500);
+                    break;
+                case 'missile':
+                    updateStatus("MISSILE FIRE!");
+                    playTone(300, 0.2, 'triangle');
+                    triggerRandomMissile(); 
+                    setTimeout(() => playSFX('explode'), 1500);
+                    break;
+                case 'jump':
+                    updateStatus("FLYING JUMP!");
+                    animatePart('whole-robot', 'anim-fly-jump', 2000);
+                    if (scrander.style.display !== 'none') {
+                         animatePart('scrander', 'anim-fly-jump', 2000);
+                    }
+                    animatePart('left-jet', 'jet-fly-jump', 2000);
+                    animatePart('right-jet', 'jet-fly-jump', 2000);
+                    playSFX('takeoff');
+                    break;
+            }
+        }
+
+        function triggerRandomMissile() {
+            const getRandomX = () => Math.random() * 300 - 150; 
+            const getRandomY = () => Math.random() * 450 - 200;
+
+            missileProj.style.setProperty('--rX1', getRandomX() + "px");
+            missileProj.style.setProperty('--rY1', getRandomY() + "px");
+            missileProj.style.setProperty('--rX2', getRandomX() + "px");
+            missileProj.style.setProperty('--rY2', getRandomY() + "px");
+            missileProj.style.setProperty('--rX3', getRandomX() + "px");
+            missileProj.style.setProperty('--rY3', getRandomY() + "px");
+
+            missileProj.classList.remove('missile-active');
+            void missileProj.offsetWidth; 
+            missileProj.style.display = 'block'; 
+            missileProj.classList.add('missile-active');
+            
+            setTimeout(() => {
+                 missileProj.classList.remove('missile-active');
+                 missileProj.style.display = 'none';
+                 resetStatus();
+            }, 2000);
+        }
+
+        function animatePart(id, animClass, duration) {
+            const el = document.getElementById(id);
+            el.classList.remove(animClass);
+            void el.offsetWidth; 
+            el.classList.add(animClass);
+            setTimeout(() => {
+                el.classList.remove(animClass);
+                resetStatus();
+            }, duration);
+        }
+        
+        function updateStatus(msg) { statusText.innerText = ">> " + msg + " <<"; }
+        function resetStatus() { if(isInteractive) statusText.innerText = ">> SYSTEM READY <<"; }
+
+    </script>
+
+</body>
+</html>
