@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>無敵鐵金剛：L9+++ 電競機台版 (Patch 4.2)</title>
+<title>無敵鐵金剛：L9+++ 傳奇版 (Patch 5.0 Pure)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
     /* --- 全局設定 --- */
     body {
@@ -21,104 +22,47 @@
         touch-action: none;
     }
 
-    /* --- 舞台容器 --- */
+    /* --- 舞台容器 (SVG + Canvas) --- */
     #stage-container {
         position: relative;
         width: 100%;
         max-width: 450px; 
-        height: 100vh; /* 全螢幕 */
+        height: 100vh; 
         background: #000;
         overflow: hidden;
         perspective: 600px;
     }
 
-    /* --- UI 儀表板 (改為分散式佈局) --- */
-    /* 移除原本的 top-bar 背景，改讓元素獨立浮動 */
-
-    /* 1. 左上角：模式與計時 (Mode Box) */
-    #game-status-panel {
+    /* 背景層：Canvas 粒子系統 (Patch 5.1) */
+    #bg-canvas {
         position: absolute;
-        top: 20px; 
-        left: 20px;
-        background: rgba(0, 20, 40, 0.6); /* 半透明 */
-        border-left: 4px solid cyan;
-        padding: 5px 10px;
-        color: white;
-        font-family: monospace;
-        z-index: 50;
-        text-align: left;
+        top: 0; left: 0; width: 100%; height: 100%;
+        z-index: 1;
         pointer-events: none;
     }
-    #mode-display { font-size: 12px; color: cyan; margin-bottom: 2px; }
-    #timer-display { font-size: 24px; color: yellow; font-weight: bold; line-height: 1; }
 
-    /* 2. 右上角：分數板 (Score Box) */
-    #hud-score-box {
-        position: absolute;
-        top: 20px; 
-        right: 20px;
-        text-align: right;
-        z-index: 50;
-        pointer-events: none;
+    /* 前景層：SVG 機器人 */
+    svg { 
+        display: block; width: 100%; height: 100%; 
+        cursor: default; overflow: visible; 
+        position: relative; z-index: 10; 
     }
-    .hud-label { color: rgba(255,255,255,0.7); font-size: 10px; display: block; text-shadow: 1px 1px 2px black; }
-    .hud-value { color: #ff0055; font-size: 24px; font-weight: 900; font-family: monospace; text-shadow: 0 0 10px red, 1px 1px 0 black; }
-    #current-score { color: #ffff00; text-shadow: 0 0 10px yellow, 1px 1px 0 black; }
-
-    /* 3. 左下角：一鍵重來 (Reset Button) */
-    #btn-reset {
-        position: absolute;
-        bottom: 20px;
-        left: 20px;
-        background: rgba(50, 50, 50, 0.5);
-        color: #aaa;
-        border: 1px solid #666;
-        padding: 8px 15px;
-        font-size: 12px;
-        cursor: pointer;
-        z-index: 60;
-        font-family: monospace;
-        transition: 0.2s;
-    }
-    #btn-reset:active { background: #fff; color: #000; }
-
-    /* 4. 底部中央：系統狀態 (Status Bar) */
-    #status-bar {
-        position: absolute;
-        bottom: 20px; left: 50%; transform: translateX(-50%);
-        color: #00ffea;
-        font-family: monospace; font-size: 12px;
-        pointer-events: none; white-space: nowrap;
-        text-shadow: 0 0 5px cyan;
-        z-index: 20;
-        opacity: 0.8;
-    }
-
-    /* --- 3D 隧道背景 --- */
-    .tunnel-wall {
-        position: absolute;
-        background-image: 
-            linear-gradient(90deg, rgba(0, 255, 255, 0.5) 2px, transparent 2px),
-            linear-gradient(180deg, rgba(0, 255, 255, 0.5) 2px, transparent 2px);
-        background-size: 80px 80px;
-        animation: warpSpeed 3s linear infinite;
-        opacity: 0.4;
-        pointer-events: none;
-    }
-    .wall-top { top: -50%; left: -50%; width: 200%; height: 100%; transform-origin: bottom; transform: rotateX(90deg) translateZ(100px); background: linear-gradient(to top, transparent, black); }
-    .wall-bottom { bottom: -50%; left: -50%; width: 200%; height: 100%; transform-origin: top; transform: rotateX(-90deg) translateZ(100px); background: linear-gradient(to bottom, transparent, black); }
-    .wall-left { left: -50%; top: -50%; width: 100%; height: 200%; transform-origin: right; transform: rotateY(90deg) translateZ(100px); background: linear-gradient(to right, black, transparent); }
-    .wall-right { right: -50%; top: -50%; width: 100%; height: 200%; transform-origin: left; transform: rotateY(-90deg) translateZ(100px); background: linear-gradient(to left, black, transparent); }
-    #warp-center { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at 50% 50%, rgba(0,20,40,1) 0%, rgba(0,0,0,0) 70%); z-index: 1; pointer-events: none; }
-    @keyframes warpSpeed { 0% { background-position: 0 0; } 100% { background-position: 0 80px; } }
-
-    svg { display: block; width: 100%; height: 100%; cursor: default; overflow: visible; position: relative; z-index: 10; }
     
     .interactive-mode { cursor: crosshair !important; }
     .interactive-part { transition: filter 0.1s; cursor: pointer; touch-action: manipulation; }
     .interactive-part:active { filter: brightness(2) sepia(1) hue-rotate(-50deg) saturate(5); }
 
-    /* --- 遊戲選單 --- */
+    /* --- 3D 物理層 (Three.js) --- */
+    #physics-canvas-layer {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        z-index: 5; /* 在背景之上，機器人之下 */
+        pointer-events: auto; /* 允許點擊物理球體 */
+        opacity: 0.8; /* 半透明，讓背景透出來 */
+    }
+
+    /* --- UI 元素 --- */
+    /* 選單 */
     #menu-overlay {
         position: absolute;
         top: 0; left: 0; width: 100%; height: 100%;
@@ -131,66 +75,37 @@
         backdrop-filter: blur(8px);
         transition: opacity 0.5s;
     }
-
-    .menu-title {
-        color: #fff; font-size: 28px; font-weight: 900; margin-bottom: 30px;
-        text-transform: uppercase; text-shadow: 0 0 15px cyan; font-style: italic;
-    }
-
-    .menu-btn {
-        width: 260px;
-        padding: 15px 0;
-        margin: 10px 0;
-        font-size: 18px; font-weight: bold; color: #000;
-        background: linear-gradient(90deg, #00ffff, #0088ff);
-        border: 2px solid #fff;
-        transform: skew(-15deg);
-        cursor: pointer;
-        box-shadow: 5px 5px 0 rgba(255,255,255,0.3);
-        transition: transform 0.1s, box-shadow 0.1s;
-    }
+    .menu-title { color: #fff; font-size: 28px; font-weight: 900; margin-bottom: 30px; text-transform: uppercase; text-shadow: 0 0 15px cyan; font-style: italic; }
+    .menu-btn { width: 260px; padding: 15px 0; margin: 10px 0; font-size: 18px; font-weight: bold; color: #000; background: linear-gradient(90deg, #00ffff, #0088ff); border: 2px solid #fff; transform: skew(-15deg); cursor: pointer; box-shadow: 5px 5px 0 rgba(255,255,255,0.3); transition: transform 0.1s, box-shadow 0.1s; }
     .menu-btn:active { transform: skew(-15deg) translate(2px, 2px); box-shadow: 2px 2px 0 rgba(255,255,255,0.3); }
     .btn-secondary { background: linear-gradient(90deg, #ffcc00, #ff8800); }
     .btn-tertiary { background: linear-gradient(90deg, #ff0055, #990033); color: white; }
-
-    .challenge-settings {
-        margin-top: 5px;
-        background: rgba(255,255,255,0.1);
-        padding: 10px;
-        border-radius: 5px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        color: white;
-        font-size: 14px;
-    }
-    input[type=range] { accent-color: #ff0055; }
-
-    /* --- 結算畫面 --- */
-    #result-modal {
-        position: absolute;
-        top: 50%; left: 50%; transform: translate(-50%, -50%);
-        width: 80%;
-        background: rgba(0, 20, 40, 0.95);
-        border: 4px solid #ffd700;
-        padding: 20px;
-        text-align: center;
-        z-index: 200;
-        display: none;
-        box-shadow: 0 0 50px rgba(255, 215, 0, 0.5);
-    }
-    .crown-icon { font-size: 50px; display: block; margin-bottom: 10px; animation: bounce 1s infinite; }
-    @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-    .winner-text { color: #ffd700; font-size: 24px; font-weight: bold; margin-bottom: 10px; }
-    .score-text { color: white; font-size: 18px; margin-bottom: 20px; }
     
-    /* --- SVG 動畫定義 --- */
-    #left-jet { transform-origin: 170px 490px; }
-    #right-jet { transform-origin: 230px 490px; }
-    #pilder-jet { transform-origin: 200px 55px; }
-    #fire-wave { transform-origin: 200px 180px; }
-    #missile-launcher { transform: translate(200px, 260px); }
+    .challenge-settings { margin-top: 5px; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px; display: flex; align-items: center; gap: 10px; color: white; font-size: 14px; }
 
+    /* HUD */
+    #game-status-panel { position: absolute; top: 20px; left: 20px; background: rgba(0, 20, 40, 0.6); border-left: 4px solid cyan; padding: 5px 10px; color: white; font-family: monospace; z-index: 50; text-align: left; pointer-events: none; display: none; }
+    #mode-display { font-size: 12px; color: cyan; margin-bottom: 2px; }
+    #timer-display { font-size: 24px; color: yellow; font-weight: bold; line-height: 1; }
+    #hud-score-box { position: absolute; top: 20px; right: 20px; text-align: right; z-index: 50; pointer-events: none; }
+    .hud-label { color: rgba(255,255,255,0.7); font-size: 10px; display: block; text-shadow: 1px 1px 2px black; }
+    .hud-value { color: #ff0055; font-size: 24px; font-weight: 900; font-family: monospace; text-shadow: 0 0 10px red, 1px 1px 0 black; }
+    #current-score { color: #ffff00; text-shadow: 0 0 10px yellow, 1px 1px 0 black; }
+    #btn-reset { position: absolute; bottom: 20px; left: 20px; background: rgba(50, 50, 50, 0.5); color: #aaa; border: 1px solid #666; padding: 8px 15px; font-size: 12px; cursor: pointer; z-index: 60; font-family: monospace; transition: 0.2s; }
+    #btn-reset:active { background: #fff; color: #000; }
+    #status-bar { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); background: rgba(0, 20, 40, 0.9); color: #00ffea; padding: 8px 20px; border: 1px solid #00ffea; font-family: monospace; font-size: clamp(12px, 4vw, 16px); pointer-events: none; white-space: nowrap; box-shadow: 0 0 10px #00ffea; z-index: 20; }
+
+    /* 結算畫面 */
+    #result-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; background: rgba(0, 20, 40, 0.95); border: 4px solid #ffd700; padding: 20px; text-align: center; z-index: 200; display: none; box-shadow: 0 0 50px rgba(255, 215, 0, 0.5); }
+    .crown-icon { font-size: 50px; display: block; margin-bottom: 10px; animation: bounce 1s infinite; }
+    @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0); } }
+    .winner-text { color: #ffd700; font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+    .score-text { color: white; font-size: 18px; margin-bottom: 10px; }
+
+    /* 節點追蹤 (Patch 4.7) */
+    #node-tracker { position: absolute; top: 80px; right: 10px; background: rgba(255, 255, 255, 0.1); color: lime; padding: 10px; font-family: monospace; font-size: 10px; border: 1px solid lime; display: none; z-index: 100; max-width: 150px; pointer-events: none; }
+
+    /* --- SVG 動畫 (Patch 3.5 完整版) --- */
     @keyframes pilderDockMove { 0% { transform: translateY(-400px) scale(0.8); opacity: 0; } 40% { transform: translateY(-100px) scale(1); opacity: 1; } 60% { transform: translateY(-100px) scale(1); } 100% { transform: translateY(0); } }
     .anim-pilder-dock-move { display: block !important; animation: pilderDockMove 0.8s ease-out forwards; }
     @keyframes jetPilderDockAnim { 0% { opacity: 0; transform: scaleY(0); } 10% { opacity: 1; transform: scaleY(1.5); } 40% { opacity: 1; transform: scaleY(1.2); } 90% { opacity: 0.5; transform: scaleY(0.5); } 100% { opacity: 0; transform: scaleY(0); } }
@@ -242,25 +157,28 @@
     .lightning-left-active { display: block !important; animation: lightningSweepLeft 1.5s ease-out; transform-origin: 130px 100px; }
     .lightning-right-active { display: block !important; animation: lightningSweepRight 1.5s ease-out; transform-origin: 270px 100px; }
 
+    #left-jet { transform-origin: 170px 490px; }
+    #right-jet { transform-origin: 230px 490px; }
+    #pilder-jet { transform-origin: 200px 55px; }
+    #missile-launcher { transform: translate(200px, 260px); }
 </style>
 </head>
 <body>
 
     <!-- 舞台 -->
     <div id="stage-container">
-        <div class="tunnel-wall wall-top"></div>
-        <div class="tunnel-wall wall-bottom"></div>
-        <div class="tunnel-wall wall-left"></div>
-        <div class="tunnel-wall wall-right"></div>
-        <div id="warp-center"></div>
+        <!-- 背景層：Canvas 粒子系統 -->
+        <canvas id="bg-canvas"></canvas>
+        <!-- 物理層：Three.js 球體 -->
+        <div id="physics-canvas-layer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: auto;"></div>
         
         <!-- 遊戲選單 -->
         <div id="menu-overlay">
             <div class="menu-title">SELECT MISSION</div>
-            <button class="menu-btn" onclick="GameEngine.startFreeMode()">自由演武 (FREE)</button>
-            <button class="menu-btn btn-secondary" onclick="GameEngine.startBattleMode()">雙人對決 (1 VS 1)</button>
+            <button id="btn-free-mode" class="menu-btn">自由演武 (FREE)</button>
+            <button id="btn-battle-mode" class="menu-btn btn-secondary">雙人對決 (1 VS 1)</button>
             <div class="challenge-group">
-                <button class="menu-btn btn-tertiary" onclick="GameEngine.startChallengeMode()">積分挑戰 (RANK)</button>
+                <button id="btn-challenge-mode" class="menu-btn btn-tertiary">積分挑戰 (RANK)</button>
                 <div class="challenge-settings">
                     <span>TIME:</span>
                     <input type="range" id="time-select" min="1" max="3" value="1" oninput="document.getElementById('time-val').innerText = this.value + ' MIN'">
@@ -270,7 +188,7 @@
         </div>
 
         <!-- 1. 左上角：狀態面板 -->
-        <div id="game-status-panel">
+        <div id="game-status-panel" style="display:none;">
             <div id="mode-display">MODE: FREE</div>
             <div id="timer-display">--:--</div>
         </div>
@@ -283,17 +201,24 @@
         </div>
 
         <!-- 3. 左下角：重置按鈕 -->
-        <button id="btn-reset" onclick="GameEngine.returnToMenu()">RESTART</button>
+        <button id="btn-reset">RESTART</button>
+
+        <!-- 節點追蹤面板 -->
+        <div id="node-tracker">
+            追蹤節點數據：<br>
+            <span id="node-pos">Pos: 0, 0, 0</span><br>
+            <span id="node-vel">Vel: 0, 0, 0</span>
+        </div>
 
         <!-- 4. 底部：狀態文字 -->
         <div id="status-bar">AWAITING SYSTEM START...</div>
 
         <!-- 結算畫面 -->
-        <div id="result-modal">
+        <div id="result-modal" style="display:none;">
             <div class="crown-icon">👑</div>
             <div class="winner-text" id="winner-text">WINNER: P1</div>
             <div class="score-text" id="end-score-text">SCORE: 1200</div>
-            <button class="menu-btn" onclick="GameEngine.returnToMenu()">BACK TO MENU</button>
+            <button id="btn-modal-menu" class="menu-btn">BACK TO MENU</button>
         </div>
 
         <svg viewBox="0 0 400 650" id="robot-stage">
@@ -305,6 +230,7 @@
                 </linearGradient>
             </defs>
 
+            <!-- 金剛飛翼 -->
             <g id="scrander" style="display:none;" class="interactive-part" onclick="handleInteract('scranderFly')">
                 <path d="M0,200 L140,180 L260,180 L400,200 L380,250 L240,220 L160,220 L20,250 Z" fill="#cc0000" stroke="black" stroke-width="2" />
                 <path d="M190,140 L210,140 L200,220 Z" fill="#cc0000" stroke="black" stroke-width="2" />
@@ -312,6 +238,7 @@
                 <polygon id="scrander-jet-right" points="290,230 310,230 300,270" fill="orange" stroke="red" stroke-width="1" style="display:none;" />
             </g>
 
+            <!-- 機器人主體 -->
             <g id="whole-robot">
                 <g id="left-leg-group" class="interactive-part" onclick="handleInteract('jump')">
                     <rect x="145" y="320" width="50" height="70" fill="#222" stroke="black" stroke-width="3" />
@@ -336,7 +263,8 @@
                 <rect x="140" y="140" width="120" height="180" fill="#222" stroke="black" stroke-width="3" />
                 <circle id="belly" class="interactive-part" cx="200" cy="260" r="15" fill="orange" stroke="black" stroke-width="2" onclick="handleInteract('missile')" />
                 
-                <g id="missile-launcher" transform="translate(200, 260)">
+                <!-- 1. 飛彈發射架：固定在肚子中心 -->
+                <g transform="translate(200, 260)">
                      <g id="missile-projectile" style="display:none;">
                         <path d="M-10,-20 L10,-20 L10,20 L-10,20 Z" fill="orange" stroke="black" />
                         <path d="M-10,-20 L0,-35 L10,-20 Z" fill="red" stroke="black" />
@@ -347,6 +275,8 @@
                     <polygon id="breast-plate" class="interactive-part" 
                              points="140,150 180,150 200,190 220,150 260,150 200,240" 
                              fill="#d32f2f" stroke="black" stroke-width="2" />
+                    
+                    <!-- 2. 火焰旋轉控制組：JS 轉這個 group -->
                     <g id="fire-rotator" transform="rotate(0, 200, 180)">
                          <path id="fire-wave" d="M200,180 L0,600 L400,600 Z" fill="url(#beam-grad)" style="opacity:0; pointer-events:none;" />
                     </g>
@@ -367,7 +297,9 @@
                     
                     <g id="pilder" style="display:none;" onclick="handleInteract('pilderFly')" class="interactive-part">
                         <rect x="185" y="40" width="30" height="15" fill="white" stroke="red" stroke-width="2" />
+                        <!-- 白色半圓玻璃罩 -->
                         <path d="M190,30 C 190,20 210,20 210,30 Z" fill="white" stroke="black" stroke-width="1" />
+                        
                         <path d="M185,40 L175,30 L225,30 L215,40 Z" fill="red" stroke="black" />
                         <rect id="pilder-wing-left" x="155" y="42" width="30" height="10" fill="red" stroke="black" stroke-width="1" />
                         <rect id="pilder-wing-right" x="215" y="42" width="30" height="10" fill="red" stroke="black" stroke-width="1" />
@@ -377,167 +309,10 @@
             </g>
         </svg>
 
+        <div id="status-bar">WAITING...</div>
     </div>
 
     <script>
-        // --- 遊戲引擎核心 (GameEngine) ---
-        const GameEngine = {
-            state: 'menu', // menu, free, battle_p1, battle_p2, challenge
-            score: 0,
-            timer: 0,
-            timerInterval: null,
-            battleScores: { p1: 0, p2: 0 },
-            
-            init: function() {
-                this.loadHighScore();
-                initAudio();
-            },
-
-            loadHighScore: function() {
-                const saved = localStorage.getItem('mazinger_highscore');
-                if (saved) {
-                    const data = JSON.parse(saved);
-                    document.getElementById('high-score-val').innerText = data.score;
-                    document.getElementById('champion-display').innerText = "CHAMPION: " + data.name;
-                }
-            },
-
-            saveHighScore: function(score) {
-                const saved = localStorage.getItem('mazinger_highscore');
-                let currentHigh = 0;
-                if (saved) currentHigh = JSON.parse(saved).score;
-
-                if (score > currentHigh) {
-                    const name = prompt("NEW RECORD! ENTER YOUR NAME:", "PILOT");
-                    if (name) {
-                        localStorage.setItem('mazinger_highscore', JSON.stringify({ name: name, score: score }));
-                        this.loadHighScore();
-                    }
-                }
-            },
-
-            startFreeMode: function() {
-                this.state = 'free';
-                this.resetUI();
-                startSequence(); // 播放開場動畫
-                this.updateStatusPanel("FREE MODE", "∞");
-            },
-
-            startBattleMode: function() {
-                // P1 先攻
-                this.battleScores = { p1: 0, p2: 0 };
-                this.startRound('battle_p1');
-            },
-
-            startRound: function(roundType) {
-                this.state = roundType;
-                this.score = 0;
-                this.timer = 60; // 1分鐘
-                this.resetUI();
-                
-                const player = roundType === 'battle_p1' ? "PLAYER 1" : "PLAYER 2";
-                alert(`${player} READY? (1 MINUTE)`);
-                
-                startSequence(); // 開場
-                
-                // 等待開場動畫結束後 (3s) 再開始計時
-                setTimeout(() => {
-                    this.startTimer(() => {
-                        this.endBattleRound();
-                    });
-                }, 3000);
-            },
-
-            endBattleRound: function() {
-                if (this.state === 'battle_p1') {
-                    this.battleScores.p1 = this.score;
-                    alert(`P1 FINISHED! SCORE: ${this.score}\nNEXT: PLAYER 2`);
-                    this.startRound('battle_p2');
-                } else {
-                    this.battleScores.p2 = this.score;
-                    this.showBattleResult();
-                }
-            },
-
-            showBattleResult: function() {
-                const p1 = this.battleScores.p1;
-                const p2 = this.battleScores.p2;
-                let winner = "DRAW";
-                if (p1 > p2) winner = "PLAYER 1";
-                if (p2 > p1) winner = "PLAYER 2";
-
-                document.getElementById('winner-text').innerText = `WINNER: ${winner}`;
-                document.getElementById('end-score-text').innerText = `P1: ${p1}  vs  P2: ${p2}`;
-                document.getElementById('result-modal').style.display = 'block';
-            },
-
-            startChallengeMode: function() {
-                const mins = document.getElementById('time-select').value;
-                this.state = 'challenge';
-                this.score = 0;
-                this.timer = mins * 60;
-                this.resetUI();
-                
-                startSequence();
-                
-                setTimeout(() => {
-                    this.startTimer(() => {
-                        this.endChallenge();
-                    });
-                }, 3000);
-            },
-
-            endChallenge: function() {
-                document.getElementById('winner-text').innerText = "TIME UP!";
-                document.getElementById('end-score-text').innerText = `FINAL SCORE: ${this.score}`;
-                document.getElementById('result-modal').style.display = 'block';
-                this.saveHighScore(this.score);
-            },
-
-            startTimer: function(onComplete) {
-                clearInterval(this.timerInterval);
-                this.updateStatusPanel(this.state.toUpperCase(), this.formatTime(this.timer));
-                
-                this.timerInterval = setInterval(() => {
-                    this.timer--;
-                    this.updateStatusPanel(null, this.formatTime(this.timer));
-                    if (this.timer <= 0) {
-                        clearInterval(this.timerInterval);
-                        onComplete();
-                    }
-                }, 1000);
-            },
-
-            addScore: function(points) {
-                if (this.state === 'menu') return;
-                this.score += points;
-                document.getElementById('current-score').innerText = this.score.toString().padStart(4, '0');
-            },
-
-            resetUI: function() {
-                document.getElementById('menu-overlay').style.display = 'none';
-                document.getElementById('result-modal').style.display = 'none';
-                document.getElementById('game-status-panel').style.display = 'block';
-                document.getElementById('current-score').innerText = "0000";
-            },
-
-            returnToMenu: function() {
-                location.reload(); // 最簡單的重置方式
-            },
-
-            updateStatusPanel: function(mode, time) {
-                if (mode) document.getElementById('mode-display').innerText = `MODE: ${mode}`;
-                if (time) document.getElementById('timer-display').innerText = time;
-            },
-
-            formatTime: function(seconds) {
-                const m = Math.floor(seconds / 60);
-                const s = seconds % 60;
-                return `${m}:${s.toString().padStart(2, '0')}`;
-            }
-        };
-
-        // --- 原有變數 ---
         const statusText = document.getElementById('status-bar');
         const startOverlay = document.getElementById('start-overlay');
         const stage = document.getElementById('robot-stage');
@@ -561,263 +336,650 @@
         const lightningL = document.getElementById('lightning-left');
         const lightningR = document.getElementById('lightning-right');
 
-        let isInteractive = false; // 控制是否可操作機器人 (開場動畫中鎖定)
-        let audioCtx = null;
-
-        // --- 初始化 ---
-        window.onload = function() {
-            GameEngine.init();
+        // --- 背景粒子系統 (Canvas) ---
+        const BgSystem = {
+            canvas: null,
+            ctx: null,
+            particles: [],
+            width: 0,
+            height: 0,
+            
+            init: function() {
+                this.canvas = document.getElementById('bg-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                
+                for(let i=0; i<100; i++) {
+                    this.particles.push(this.createParticle());
+                }
+                
+                this.animate();
+            },
+            
+            resize: function() {
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+                this.canvas.width = this.width;
+                this.canvas.height = this.height;
+            },
+            
+            createParticle: function() {
+                return {
+                    x: 0, y: 0,
+                    z: Math.random() * 2000, 
+                    color: `hsl(${Math.random()*40 + 180}, 100%, 70%)` 
+                };
+            },
+            
+            animate: function() {
+                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; 
+                this.ctx.fillRect(0, 0, this.width, this.height);
+                
+                const cx = this.width / 2;
+                const cy = this.height / 2;
+                
+                this.particles.forEach(p => {
+                    p.z -= 20; 
+                    if(p.z <= 0) {
+                        p.z = 2000; 
+                        p.x = (Math.random() - 0.5) * this.width * 2;
+                        p.y = (Math.random() - 0.5) * this.height * 2;
+                    }
+                    
+                    const scale = 1000 / p.z;
+                    const x2d = cx + p.x * scale;
+                    const y2d = cy + p.y * scale;
+                    const size = scale * 2;
+                    
+                    if(x2d > 0 && x2d < this.width && y2d > 0 && y2d < this.height) {
+                        this.ctx.fillStyle = p.color;
+                        this.ctx.beginPath();
+                        this.ctx.arc(x2d, y2d, size, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    }
+                });
+                
+                requestAnimationFrame(() => this.animate());
+            }
         };
 
-        // --- Audio (Web Audio API) ---
-        function initAudio() {
-            try {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                audioCtx = new AudioContext();
-            } catch (e) {}
-        }
-
-        function playTone(freq, duration, type = 'square') {
-            if (!audioCtx) return;
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            try {
-                const osc = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-                osc.type = type;
-                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-                osc.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + duration);
-            } catch(e){}
-        }
-
-        function playThemeSong() {
-            if (!audioCtx) return;
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            const now = audioCtx.currentTime;
-            const notes = [
-                {f: 392, t: 0}, {f: 392, t: 0.2}, {f: 392, t: 0.4},
-                {f: 523, t: 0.8}, {f: 523, t: 1.2},
-                {f: 587, t: 1.6}, {f: 622, t: 2.0},
-                {f: 587, t: 2.4}, {f: 523, t: 2.8},
-                {f: 466, t: 3.2},
-                {f: 523, t: 4.0}, {f: 392, t: 4.4},
-                {f: 349, t: 4.8},
-                {f: 523, t: 6.0}, {f: 784, t: 6.5}
-            ];
-            notes.forEach(n => {
-                try {
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
-                    osc.type = 'sawtooth';
-                    osc.frequency.value = n.f;
-                    gain.gain.setValueAtTime(0.1, now + n.t);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + n.t + 0.3);
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    osc.start(now + n.t);
-                    osc.stop(now + n.t + 0.3);
-                } catch(e){}
-            });
-        }
-        
-        function playSFX(type) {
-            if (!audioCtx) return;
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            const now = audioCtx.currentTime;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
+        // --- 3D 物理層 (Three.js - 200 顆球體) ---
+        const PhysicsSystem = {
+            scene: null, camera: null, renderer: null,
+            balls: [],
+            BALL_COUNT: 200,
+            MAX_RED_BALLS: 10,
+            IMPACT_RADIUS: 30,
+            IMPACT_STRENGTH: 10,
             
-            try {
-                if (type === 'jump' || type === 'takeoff') {
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(100, now);
-                    osc.frequency.exponentialRampToValueAtTime(50, now + 0.5);
-                    gain.gain.setValueAtTime(0.2, now);
-                    gain.gain.linearRampToValueAtTime(0, now + 0.5);
-                } else if (type === 'beam' || type === 'spark') {
-                    osc.type = 'square';
-                    osc.frequency.setValueAtTime(800, now);
-                    osc.frequency.exponentialRampToValueAtTime(100, now + 0.3);
-                    gain.gain.setValueAtTime(0.1, now);
-                    gain.gain.linearRampToValueAtTime(0, now + 0.3);
-                } else if (type === 'fire' || type === 'explode') {
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(50, now);
-                    osc.frequency.linearRampToValueAtTime(20, now + 1.0);
-                    gain.gain.setValueAtTime(0.4, now);
-                    gain.gain.linearRampToValueAtTime(0, now + 1.0);
-                }
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(now + 1.0);
-            } catch(e){}
-        }
-
-
-        function startSequence() {
-            // 1. 指揮艇極速飛入
-            pilder.style.display = 'block';
-            pilder.classList.add('anim-pilder-dock-move');
-            animatePart('pilder-jet', 'jet-pilder-dock', 800);
-            pilderWingL.classList.add('anim-wing-fold-left');
-            pilderWingR.classList.add('anim-wing-fold-right');
-            
-            playThemeSong();
-
-            setTimeout(() => {
-                updateStatus("SCRANDER CROSS");
-                scrander.style.display = 'block';
-                scrander.classList.add('anim-scrander-cross');
-                eyeLeft.style.fill = "yellow"; eyeRight.style.fill = "yellow";
-                playSFX('beam');
-            }, 800);
-
-            setTimeout(() => {
-                updateStatus("MAZIN GO!");
-                wholeRobot.classList.add('anim-takeoff');
-                leftJet.classList.add('jet-takeoff');
-                rightJet.classList.add('jet-takeoff');
-                playSFX('takeoff');
-            }, 1300);
-
-            setTimeout(() => {
-                updateStatus("READY");
-                wholeRobot.classList.remove('anim-takeoff');
-                wholeRobot.classList.add('anim-landing');
-                leftJet.classList.remove('jet-takeoff');
-                rightJet.classList.remove('jet-takeoff');
-                playSFX('jump');
-
-                document.getElementById('robot-stage').classList.add('interactive-mode');
-                isInteractive = true; // 解鎖操控
+            init: function() {
+                const container = document.getElementById('physics-canvas-layer');
+                if(!container) return;
                 
-            }, 3000);
-        }
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera.position.z = 100;
+                
+                this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); // Alpha true for transparency
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                container.appendChild(this.renderer.domElement);
 
-        function handleInteract(action) {
-            if (!isInteractive) return;
-            event.stopPropagation(); 
+                // Lights
+                const ambientLight = new THREE.AmbientLight(0x404040, 2);
+                this.scene.add(ambientLight);
+                const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+                dirLight.position.set(10, 10, 10);
+                this.scene.add(dirLight);
 
-            // 記分邏輯
-            const points = 100;
-            GameEngine.addScore(points);
-
-            switch(action) {
-                case 'pilderFly':
-                    updateStatus("PILDER OFF!");
-                    animatePart('pilder', 'anim-pilder-fly', 2500);
-                    animatePart('pilder-jet', 'jet-pilder-fly', 2500);
-                    playSFX('jump');
-                    break;
-                case 'scranderFly':
-                    updateStatus("SCRANDER OFF!");
-                    animatePart('scrander', 'anim-scrander-off', 1500);
-                    animatePart('scrander-jet-left', 'jet-scrander-active', 1500);
-                    animatePart('scrander-jet-right', 'jet-scrander-active', 1500);
-                    playSFX('takeoff');
-                    setTimeout(() => { scrander.style.display = 'none'; }, 1500);
-                    break;
-                case 'punchLeft':
-                    updateStatus("ROCKET PUNCH (L)!");
-                    animatePart('left-arm', 'punching-up', 1800);
-                    playSFX('takeoff');
-                    break;
-                case 'punchRight':
-                    updateStatus("ROCKET PUNCH (R)!");
-                    animatePart('right-arm', 'punching-up', 1800);
-                    playSFX('takeoff');
-                    break;
-                case 'beam':
-                    updateStatus("PHOTON BEAM!");
-                    beamLeft.classList.add('beam-active');
-                    beamRight.classList.add('beam-active');
-                    playSFX('beam');
-                    setTimeout(() => {
-                        beamLeft.classList.remove('beam-active');
-                        beamRight.classList.remove('beam-active');
-                        resetStatus();
-                    }, 1500);
-                    break;
-                case 'earLightning':
-                    updateStatus("THUNDER RADAR!");
-                    animatePart('lightning-left', 'lightning-left-active', 1500);
-                    animatePart('lightning-right', 'lightning-right-active', 1500);
-                    playSFX('spark');
-                    break;
-                case 'fire':
-                    updateStatus("BREAST FIRE!!!!");
-                    const randomAngle = Math.random() * 60 - 30; 
-                    fireRotator.setAttribute("transform", `rotate(${randomAngle}, 200, 180)`);
-                    wholeRobot.classList.add('pose-fire-mode');
-                    fireWave.classList.add('fire-active');
-                    playSFX('fire');
-                    setTimeout(() => {
-                        wholeRobot.classList.remove('pose-fire-mode');
-                        fireWave.classList.remove('fire-active');
-                        fireRotator.setAttribute("transform", `rotate(0, 200, 180)`);
-                        resetStatus();
-                    }, 2500);
-                    break;
-                case 'missile':
-                    updateStatus("MISSILE FIRE!");
-                    playTone(300, 0.2, 'triangle');
-                    triggerRandomMissile(); 
-                    setTimeout(() => playSFX('explode'), 1500);
-                    break;
-                case 'jump':
-                    updateStatus("FLYING JUMP!");
-                    animatePart('whole-robot', 'anim-fly-jump', 2000);
-                    if (scrander.style.display !== 'none') {
-                         animatePart('scrander', 'anim-fly-jump', 2000);
-                    }
-                    animatePart('left-jet', 'jet-fly-jump', 2000);
-                    animatePart('right-jet', 'jet-fly-jump', 2000);
-                    playSFX('takeoff');
-                    break;
-            }
-        }
-
-        function triggerRandomMissile() {
-            const getRandomX = () => Math.random() * 300 - 150; 
-            const getRandomY = () => Math.random() * 450 - 200;
-
-            missileProj.style.setProperty('--rX1', getRandomX() + "px");
-            missileProj.style.setProperty('--rY1', getRandomY() + "px");
-            missileProj.style.setProperty('--rX2', getRandomX() + "px");
-            missileProj.style.setProperty('--rY2', getRandomY() + "px");
-            missileProj.style.setProperty('--rX3', getRandomX() + "px");
-            missileProj.style.setProperty('--rY3', getRandomY() + "px");
-
-            missileProj.classList.remove('missile-active');
-            void missileProj.offsetWidth; 
-            missileProj.style.display = 'block'; 
-            missileProj.classList.add('missile-active');
+                this.createBalls();
+                this.animate();
+                
+                window.addEventListener('resize', () => {
+                     this.camera.aspect = window.innerWidth / window.innerHeight;
+                     this.camera.updateProjectionMatrix();
+                     this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+                
+                // 點擊事件 (紅球干預)
+                container.addEventListener('mousedown', (e) => this.onPointerDown(e));
+                container.addEventListener('touchstart', (e) => this.onPointerDown(e));
+            },
             
-            setTimeout(() => {
-                 missileProj.classList.remove('missile-active');
-                 missileProj.style.display = 'none';
-                 resetStatus();
-            }, 2000);
+            createBalls: function() {
+                const geometry = new THREE.SphereGeometry(1, 16, 16);
+                for(let i=0; i<this.BALL_COUNT; i++) {
+                    const material = new THREE.MeshStandardMaterial({ 
+                        color: 0x0088ff, roughness: 0.3, metalness: 0.8 
+                    });
+                    const mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set((Math.random()-0.5)*100, (Math.random()-0.5)*100, (Math.random()-0.5)*50);
+                    
+                    this.balls.push({
+                        mesh: mesh,
+                        dx: (Math.random()-0.5)*0.5,
+                        dy: (Math.random()-0.5)*0.5,
+                        dz: (Math.random()-0.5)*0.5,
+                        mass: 1.5, // Blue mass
+                        isRed: false
+                    });
+                    this.scene.add(mesh);
+                }
+            },
+            
+            onPointerDown: function(event) {
+                event.preventDefault();
+                // 簡化：在隨機位置生成紅球並施加衝力
+                const redBall = {
+                     mesh: new THREE.Mesh(
+                         new THREE.SphereGeometry(3, 16, 16),
+                         new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 0.3, metalness: 0.5 })
+                     ),
+                     dx: (Math.random()-0.5)*2,
+                     dy: (Math.random()-0.5)*2,
+                     dz: (Math.random()-0.5)*2,
+                     mass: 0.5, // Red mass
+                     isRed: true
+                };
+                redBall.mesh.position.set(0,0,20); // Start near camera
+                this.balls.push(redBall);
+                this.scene.add(redBall.mesh);
+                
+                // Limit red balls
+                if(this.balls.filter(b=>b.isRed).length > this.MAX_RED_BALLS) {
+                    const old = this.balls.find(b=>b.isRed);
+                    this.scene.remove(old.mesh);
+                    this.balls = this.balls.filter(b=>b!==old);
+                }
+            },
+
+            animate: function() {
+                requestAnimationFrame(() => this.animate());
+                
+                // Physics Update
+                this.balls.forEach(b => {
+                    b.mesh.position.x += b.dx;
+                    b.mesh.position.y += b.dy;
+                    b.mesh.position.z += b.dz;
+                    
+                    // Boundary bounce
+                    if(Math.abs(b.mesh.position.x) > 60) b.dx *= -1;
+                    if(Math.abs(b.mesh.position.y) > 60) b.dy *= -1;
+                    if(Math.abs(b.mesh.position.z) > 60) b.dz *= -1;
+                    
+                    // Damping (L10 logic)
+                    b.dx *= 0.99; b.dy *= 0.99; b.dz *= 0.99;
+                });
+                
+                this.renderer.render(this.scene, this.camera);
+            }
+        };
+
+
+        // --- 遊戲引擎 ---
+        const GameEngine = {
+            state: 'menu', 
+            score: 0,
+            timer: 0,
+            timerInterval: null,
+            isInteractive: false, 
+            audioCtx: null,
+            
+            init: function() {
+                this.loadHighScore();
+                this.initAudio();
+                BgSystem.init();
+                PhysicsSystem.init(); // 啟動 3D 物理層
+                
+                // 綁定事件 (L10 容錯綁定)
+                const safeBind = (id, event, handler) => {
+                    const el = document.getElementById(id);
+                    if (el) el.addEventListener(event, handler);
+                };
+
+                safeBind('btn-free-mode', 'click', () => this.startFreeMode());
+                safeBind('btn-battle-mode', 'click', () => this.startBattleMode());
+                safeBind('btn-challenge-mode', 'click', () => this.startChallengeMode());
+                safeBind('btn-reset', 'click', () => this.returnToMenu());
+                safeBind('btn-modal-menu', 'click', () => this.returnToMenu());
+
+                // 互動區域綁定
+                safeBind('pilder', 'click', (e) => this.handleInteract('pilderFly', e));
+                safeBind('scrander', 'click', (e) => this.handleInteract('scranderFly', e));
+                safeBind('left-leg-group', 'click', (e) => this.handleInteract('jump', e));
+                safeBind('right-leg-group', 'click', (e) => this.handleInteract('jump', e));
+                safeBind('left-arm', 'click', (e) => this.handleInteract('punchLeft', e));
+                safeBind('right-arm', 'click', (e) => this.handleInteract('punchRight', e));
+                safeBind('head-click-area', 'click', (e) => this.handleInteract('beam', e));
+                safeBind('eye-left', 'click', (e) => this.handleInteract('beam', e));
+                safeBind('eye-right', 'click', (e) => this.handleInteract('beam', e));
+                safeBind('ear-left', 'click', (e) => this.handleInteract('earLightning', e));
+                safeBind('ear-right', 'click', (e) => this.handleInteract('earLightning', e));
+                safeBind('breast-group', 'click', (e) => this.handleInteract('fire', e));
+                safeBind('belly', 'click', (e) => this.handleInteract('missile', e));
+            },
+            
+            initAudio: function() {
+                try {
+                    if (!this.audioCtx) {
+                        const AudioContext = window.AudioContext || window.webkitAudioContext;
+                        this.audioCtx = new AudioContext();
+                    }
+                    if (this.audioCtx.state === 'suspended') {
+                        this.audioCtx.resume();
+                    }
+                } catch (e) {}
+            },
+            
+            playTone: function(freq, duration, type = 'square', volume = 0.1) {
+                if (!this.audioCtx) return;
+                try {
+                    const osc = this.audioCtx.createOscillator();
+                    const gainNode = this.audioCtx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.audioCtx.currentTime);
+                    gainNode.gain.setValueAtTime(volume, this.audioCtx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + duration);
+                    osc.connect(gainNode);
+                    gainNode.connect(this.audioCtx.destination);
+                    osc.start();
+                    osc.stop(this.audioCtx.currentTime + duration);
+                } catch(e){}
+            },
+            
+            playSFX: function(type) {
+                 if (!this.audioCtx) return;
+                try {
+                    const osc = this.audioCtx.createOscillator();
+                    const gain = this.audioCtx.createGain();
+                    const now = this.audioCtx.currentTime;
+                    if (type === 'jump' || type === 'takeoff') {
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(100, now);
+                        osc.frequency.exponentialRampToValueAtTime(50, now + 0.5);
+                        gain.gain.setValueAtTime(0.2, now);
+                        gain.gain.linearRampToValueAtTime(0, now + 0.5);
+                    } else if (type === 'beam' || type === 'spark') {
+                        osc.type = 'square';
+                        osc.frequency.setValueAtTime(800, now);
+                        osc.frequency.exponentialRampToValueAtTime(100, now + 0.3);
+                        gain.gain.setValueAtTime(0.1, now);
+                        gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                    } else if (type === 'fire' || type === 'explode') {
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(50, now);
+                        osc.frequency.linearRampToValueAtTime(20, now + 1.0);
+                        gain.gain.setValueAtTime(0.4, now);
+                        gain.gain.linearRampToValueAtTime(0, now + 1.0);
+                    }
+                    osc.connect(gain);
+                    gain.connect(this.audioCtx.destination);
+                    osc.start();
+                    osc.stop(now + 1.0);
+                } catch(e){}
+            },
+            
+            playThemeSong: function() {
+                 if (!this.audioCtx) return;
+                 const now = this.audioCtx.currentTime;
+                 [392, 392, 392, 523, 523, 587, 622].forEach((f, i) => {
+                     setTimeout(() => this.playTone(f, 0.3, 'sawtooth', 0.1), i * 500);
+                 });
+            },
+            
+            loadHighScore: function() {
+                const saved = localStorage.getItem('mazinger_highscore');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    const scoreEl = document.getElementById('high-score-val');
+                    const champEl = document.getElementById('champion-display');
+                    if(scoreEl) scoreEl.innerText = data.score;
+                    if(champEl) champEl.innerText = "CHAMPION: " + data.name;
+                }
+            },
+
+            saveHighScore: function(score) {
+                const saved = localStorage.getItem('mazinger_highscore');
+                let currentHigh = 0;
+                if (saved) currentHigh = JSON.parse(saved).score;
+
+                if (score > currentHigh) {
+                    const name = prompt("NEW RECORD! ENTER YOUR NAME:", "PILOT");
+                    if (name) {
+                        localStorage.setItem('mazinger_highscore', JSON.stringify({ name: name, score: score }));
+                        this.loadHighScore();
+                    }
+                }
+            },
+
+            startFreeMode: function() {
+                this.state = 'free';
+                this.resetUI();
+                
+                const status = document.getElementById('status-bar');
+                if (status) status.innerText = "GENERATING MISSION...";
+                
+                setTimeout(() => {
+                     this.startSequence(); 
+                     this.updateStatusPanel("FREE MODE", "∞");
+                }, 500);
+            },
+
+            startBattleMode: function() {
+                this.state = 'battle_p1';
+                this.score = 0;
+                this.timer = 60; 
+                this.resetUI();
+                
+                if(confirm(`PLAYER 1 READY? (1 MINUTE)`)) {
+                     this.startSequence(); 
+                     setTimeout(() => { this.startTimer(() => { this.endBattleRound(); }); }, 3000);
+                } else {
+                    this.returnToMenu();
+                }
+            },
+
+            endBattleRound: function() {
+                 // 簡化：直接顯示結算 (單人演示)
+                 this.showBattleResult();
+            },
+
+            showBattleResult: function() {
+                const modalEl = document.getElementById('result-modal');
+                const winnerEl = document.getElementById('winner-text');
+                
+                if(modalEl) {
+                    winnerEl.innerText = "WINNER: P1"; 
+                    modalEl.style.display = 'block';
+                }
+            },
+
+            startChallengeMode: function() {
+                const timeSelect = document.getElementById('time-select');
+                const mins = timeSelect ? timeSelect.value : 1;
+                this.state = 'challenge';
+                this.score = 0;
+                this.timer = mins * 60;
+                this.resetUI();
+                this.startSequence(); 
+                setTimeout(() => { this.startTimer(() => { this.endChallenge(); }); }, 3000);
+            },
+
+            endChallenge: function() {
+                const modalEl = document.getElementById('result-modal');
+                const winnerEl = document.getElementById('winner-text');
+                const scoreEl = document.getElementById('end-score-text');
+                
+                if(modalEl) {
+                    winnerEl.innerText = "TIME UP!";
+                    if(scoreEl) scoreEl.innerText = `FINAL SCORE: ${this.score}`;
+                    modalEl.style.display = 'block';
+                    this.saveHighScore(this.score);
+                }
+            },
+
+            startTimer: function(onComplete) {
+                clearInterval(this.timerInterval);
+                this.updateStatusPanel(this.state.toUpperCase(), this.formatTime(this.timer));
+                this.timerInterval = setInterval(() => {
+                    this.timer--;
+                    this.updateStatusPanel(null, this.formatTime(this.timer));
+                    if (this.timer <= 0) {
+                        clearInterval(this.timerInterval);
+                        onComplete();
+                    }
+                }, 1000);
+            },
+
+            addScore: function(points) {
+                if (this.state === 'menu') return; 
+                this.score += points;
+                const scoreEl = document.getElementById('current-score');
+                if(scoreEl) scoreEl.innerText = this.score.toString().padStart(4, '0');
+            },
+
+            resetUI: function() {
+                clearInterval(this.timerInterval);
+                const menu = document.getElementById('menu-overlay');
+                const result = document.getElementById('result-modal');
+                const status = document.getElementById('game-status-panel');
+                const score = document.getElementById('current-score');
+                const aiDialog = document.getElementById('ai-dialog-box');
+
+                if (menu) menu.style.display = 'none';
+                if (result) result.style.display = 'none';
+                if (aiDialog) aiDialog.style.display = 'none';
+                if (status) status.style.display = 'block';
+                if (score) score.innerText = "0000";
+            },
+
+            returnToMenu: function() {
+                location.reload(); 
+            },
+
+            updateStatusPanel: function(mode, time) {
+                const modeEl = document.getElementById('mode-display');
+                const timerEl = document.getElementById('timer-display');
+                if (mode && modeEl) modeEl.innerText = `MODE: ${mode}`;
+                if (time && timerEl) timerEl.innerText = time;
+            },
+
+            formatTime: function(seconds) {
+                const m = Math.floor(seconds / 60);
+                const s = seconds % 60;
+                return `${m}:${s.toString().padStart(2, '0')}`;
+            },
+            
+            startSequence: function() {
+                this.initAudio();
+                const overlay = document.getElementById('start-overlay');
+                if(overlay) overlay.style.display = 'none';
+                
+                this.playThemeSong();
+                this.updateStatus("FAST LAUNCH SEQUENCE!");
+                
+                // SVG 元素操作
+                const pilder = document.getElementById('pilder');
+                const pilderWingL = document.getElementById('pilder-wing-left');
+                const pilderWingR = document.getElementById('pilder-wing-right');
+                const pilderJet = document.getElementById('pilder-jet');
+                const scrander = document.getElementById('scrander');
+                const eyeLeft = document.getElementById('eye-left');
+                const eyeRight = document.getElementById('eye-right');
+                const wholeRobot = document.getElementById('whole-robot');
+                const leftJet = document.getElementById('left-jet');
+                const rightJet = document.getElementById('right-jet');
+                const stageEl = document.getElementById('robot-stage');
+
+
+                if(pilder) {
+                    pilder.style.display = 'block';
+                    pilder.classList.add('anim-pilder-dock-move');
+                }
+                this.animatePart('pilder-jet', 'jet-pilder-dock', 800);
+                if(pilderWingL) pilderWingL.classList.add('anim-wing-fold-left');
+                if(pilderWingR) pilderWingR.classList.add('anim-wing-fold-right');
+
+                setTimeout(() => {
+                    this.updateStatus("SCRANDER CROSS");
+                    if(scrander) {
+                        scrander.style.display = 'block';
+                        scrander.classList.add('anim-scrander-cross');
+                    }
+                    if(eyeLeft) eyeLeft.style.fill = "yellow"; 
+                    if(eyeRight) eyeRight.style.fill = "yellow";
+                    this.playSFX('beam');
+                }, 800);
+
+                setTimeout(() => {
+                    this.updateStatus("MAZIN GO!");
+                    if(wholeRobot) wholeRobot.classList.add('anim-takeoff');
+                    if(leftJet) leftJet.classList.add('jet-takeoff');
+                    if(rightJet) rightJet.classList.add('jet-takeoff');
+                    this.playSFX('takeoff');
+                }, 1300);
+
+                setTimeout(() => {
+                    this.updateStatus("READY");
+                    if(wholeRobot) {
+                        wholeRobot.classList.remove('anim-takeoff');
+                        wholeRobot.classList.add('anim-landing');
+                    }
+                    if(leftJet) leftJet.classList.remove('jet-takeoff');
+                    if(rightJet) rightJet.classList.remove('jet-takeoff');
+                    this.playSFX('jump');
+                    
+                    if(stageEl) stageEl.classList.add('interactive-mode');
+                    this.isInteractive = true; 
+                    
+                    setInterval(() => { if(this.isInteractive) this.playThemeSong(); }, 8000);
+                }, 3000);
+            },
+            
+            handleInteract: function(action, event) {
+                if (!this.isInteractive) return;
+                if(event) event.stopPropagation(); 
+
+                let points = 100;
+                if (action === 'fire') points = 150;
+                if (action === 'missile') points = 200;
+                this.addScore(points);
+
+                // 呼叫動畫函數
+                switch(action) {
+                    case 'pilderFly':
+                        this.updateStatus("PILDER OFF!");
+                        this.animatePart('pilder', 'anim-pilder-fly', 2500);
+                        this.animatePart('pilder-jet', 'jet-pilder-fly', 2500);
+                        this.playSFX('jump');
+                        break;
+                    case 'scranderFly':
+                        this.updateStatus("SCRANDER OFF!");
+                        this.animatePart('scrander', 'anim-scrander-off', 1500);
+                        this.animatePart('scrander-jet-left', 'jet-scrander-active', 1500);
+                        this.animatePart('scrander-jet-right', 'jet-scrander-active', 1500);
+                        this.playSFX('takeoff');
+                        const sc = document.getElementById('scrander');
+                        if(sc) setTimeout(() => { sc.style.display = 'none'; }, 1500);
+                        break;
+                    case 'punchLeft':
+                        this.updateStatus("ROCKET PUNCH (L)!");
+                        this.animatePart('left-arm', 'punching-up', 1800);
+                        this.playSFX('takeoff');
+                        break;
+                    case 'punchRight':
+                        this.updateStatus("ROCKET PUNCH (R)!");
+                        this.animatePart('right-arm', 'punching-up', 1800);
+                        this.playSFX('takeoff');
+                        break;
+                    case 'beam':
+                        this.updateStatus("PHOTON BEAM!");
+                        const bl = document.getElementById('beam-left');
+                        const br = document.getElementById('beam-right');
+                        if(bl) bl.classList.add('beam-active');
+                        if(br) br.classList.add('beam-active');
+                        this.playSFX('beam');
+                        setTimeout(() => {
+                            if(bl) bl.classList.remove('beam-active');
+                            if(br) br.classList.remove('beam-active');
+                            this.resetStatus();
+                        }, 1500);
+                        break;
+                    case 'earLightning':
+                        this.updateStatus("THUNDER RADAR!");
+                        this.animatePart('lightning-left', 'lightning-left-active', 1500);
+                        this.animatePart('lightning-right', 'lightning-right-active', 1500);
+                        this.playSFX('spark');
+                        break;
+                    case 'fire':
+                        this.updateStatus("BREAST FIRE!!!!");
+                        const fr = document.getElementById('fire-rotator');
+                        const wr = document.getElementById('whole-robot');
+                        const fw = document.getElementById('fire-wave');
+                        const randomAngle = Math.random() * 60 - 30; 
+                        if(fr) fr.setAttribute("transform", `rotate(${randomAngle}, 200, 180)`);
+                        if(wr) wr.classList.add('pose-fire-mode');
+                        if(fw) fw.classList.add('fire-active');
+                        this.playSFX('fire');
+                        setTimeout(() => {
+                            if(wr) wr.classList.remove('pose-fire-mode');
+                            if(fw) fw.classList.remove('fire-active');
+                            if(fr) fr.setAttribute("transform", `rotate(0, 200, 180)`);
+                            this.resetStatus();
+                        }, 2500);
+                        break;
+                    case 'missile':
+                        this.updateStatus("MISSILE FIRE!");
+                        this.playTone(300, 0.2, 'triangle');
+                        this.triggerRandomMissile(); 
+                        setTimeout(() => this.playSFX('explode'), 1500);
+                        break;
+                    case 'jump':
+                        this.updateStatus("FLYING JUMP!");
+                        this.animatePart('whole-robot', 'anim-fly-jump', 2000);
+                        const sc2 = document.getElementById('scrander');
+                        if (sc2 && sc2.style.display !== 'none') {
+                             this.animatePart('scrander', 'anim-fly-jump', 2000);
+                        }
+                        this.animatePart('left-jet', 'jet-fly-jump', 2000);
+                        this.animatePart('right-jet', 'jet-fly-jump', 2000);
+                        this.playSFX('takeoff');
+                        break;
+                }
+            },
+            
+            triggerRandomMissile: function() {
+                const getRandomX = () => Math.random() * 300 - 150; 
+                const getRandomY = () => Math.random() * 450 - 200;
+                const mp = document.getElementById('missile-projectile');
+                if(mp) {
+                    mp.style.setProperty('--rX1', getRandomX() + "px");
+                    mp.style.setProperty('--rY1', getRandomY() + "px");
+                    mp.style.setProperty('--rX2', getRandomX() + "px");
+                    mp.style.setProperty('--rY2', getRandomY() + "px");
+                    mp.style.setProperty('--rX3', getRandomX() + "px");
+                    mp.style.setProperty('--rY3', getRandomY() + "px");
+                    mp.classList.remove('missile-active');
+                    void mp.offsetWidth; 
+                    mp.style.display = 'block'; 
+                    mp.classList.add('missile-active');
+                    setTimeout(() => {
+                         mp.classList.remove('missile-active');
+                         mp.style.display = 'none';
+                         this.resetStatus();
+                    }, 2000);
+                }
+            },
+
+            animatePart: function(id, animClass, duration) {
+                const el = typeof id === 'string' ? document.getElementById(id) : id;
+                if(!el) return;
+                el.classList.remove(animClass);
+                void el.offsetWidth; 
+                el.classList.add(animClass);
+                setTimeout(() => { el.classList.remove(animClass); this.resetStatus(); }, duration);
+            },
+            
+            updateStatus: function(msg) { 
+                const statusText = document.getElementById('status-bar');
+                if(statusText) statusText.innerText = ">> " + msg + " <<"; 
+            },
+            
+            resetStatus: function() { 
+                const statusText = document.getElementById('status-bar');
+                if(this.isInteractive && statusText) statusText.innerText = ">> SYSTEM READY <<"; 
+            }
+        };
+        
+        // 全域 handleInteract 轉發器，供 HTML onclick 使用
+        function handleInteract(action, event) {
+            GameEngine.handleInteract(action, event);
         }
 
-        function animatePart(id, animClass, duration) {
-            const el = document.getElementById(id);
-            el.classList.remove(animClass);
-            void el.offsetWidth; 
-            el.classList.add(animClass);
-            setTimeout(() => {
-                el.classList.remove(animClass);
-                resetStatus();
-            }, duration);
-        }
-        
-        function updateStatus(msg) { statusText.innerText = ">> " + msg + " <<"; }
-        function resetStatus() { if(isInteractive) statusText.innerText = ">> SYSTEM READY <<"; }
+        // L10 憲章保障：確保 GameEngine 啟動時機正確
+        document.addEventListener('DOMContentLoaded', function() {
+            GameEngine.init();
+        });
 
     </script>
 
